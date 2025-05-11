@@ -56,9 +56,9 @@ namespace CNUSPACKER.packaging
             BigEndianMemoryStream buffer = new BigEndianMemoryStream(GetDataSize());
 
             buffer.WriteBigEndian(signatureType);
-            buffer.Write(signature);
+            buffer.Write(signature, 0, signature.Length);
             buffer.Seek(60, SeekOrigin.Current);
-            buffer.Write(issuer);
+            buffer.Write(issuer, 0, issuer.Length);
 
             buffer.WriteByte(version);
             buffer.WriteByte(CACRLVersion);
@@ -77,13 +77,17 @@ namespace CNUSPACKER.packaging
             buffer.WriteBigEndian(bootIndex);
             buffer.Seek(2, SeekOrigin.Current);
 
-            buffer.Write(SHA2);
+            buffer.Write(SHA2, 0, SHA2.Length);
 
-            buffer.Write(contentInfo.GetAsData());
-            buffer.Write(contents.GetAsData());
+            byte[] contentInfoData = contentInfo.GetAsData();
+            buffer.Write(contentInfoData, 0, contentInfoData.Length);
+
+            byte[] contentsData = contents.GetAsData();
+            buffer.Write(contentsData, 0, contentsData.Length);
 
             return buffer.GetBuffer();
         }
+
 
         private int GetDataSize()
         {

@@ -12,8 +12,9 @@ namespace CNUSPACKER.Packaging
         /// <summary>
         /// Constructs a new NUSpackage using the given configuration.
         /// </summary>
-        public static NUSpackage CreateNewPackage(NusPackageConfiguration config, ILogger<NUSpackage>? logger = null)
+        public static NUSpackage CreateNewPackage(NusPackageConfiguration config, ILoggerFactory loggerFactory)
         {
+            var logger = loggerFactory.CreateLogger<NUSpackage>();
             var contents = new Contents();
             var fst = new FST(contents);
 
@@ -21,18 +22,19 @@ namespace CNUSPACKER.Packaging
             root.SetContent(contents.FstContent);
 
             PopulateFSTEntries(config.Dir, root);
-            logger?.LogInformation("Finished reading input files. Applying content rules...");
+            logger.LogInformation("Finished reading input files. Applying content rules...");
 
-            var ruleService = new ContentRulesService(logger?.CreateLogger<ContentRulesService>() ?? throw new InvalidDataException("Logger required"));
+            var ruleServiceLogger = loggerFactory.CreateLogger<ContentRulesService>();
+            var ruleService = new ContentRulesService(ruleServiceLogger);
             ruleService.ApplyRules(root, contents, config.Rules);
 
-            logger?.LogInformation("Generating the FST...");
+            logger.LogInformation("Generating the FST...");
             fst.Update();
 
-            logger?.LogInformation("Generating the Ticket...");
+            logger.LogInformation("Generating the Ticket...");
             var ticket = new Ticket(config.AppInfo.TitleID, config.EncryptionKey, config.EncryptKeyWith);
 
-            logger?.LogInformation("Generating the TMD...");
+            logger.LogInformation("Generating the TMD...");
             var tmd = new TMD(config.AppInfo, fst, ticket);
 
             return new NUSpackage(fst, ticket, tmd, logger);

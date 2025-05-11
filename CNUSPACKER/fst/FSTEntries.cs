@@ -1,23 +1,34 @@
 using System.Collections.Generic;
 using System.Linq;
-using CNUSPACKER.contents;
-using CNUSPACKER.packaging;
+using Microsoft.Extensions.Logging;
+using CNUSPACKER.Packaging;
 
-namespace CNUSPACKER.fst
+namespace CNUSPACKER.FST
 {
+    /// <summary>
+    /// Manages a tree of <see cref="FSTEntry"/> instances and provides serialization logic.
+    /// </summary>
     public class FSTEntries
     {
-        private readonly List<FSTEntry> entries = new List<FSTEntry>();
+        private readonly List<FSTEntry> _entries;
+        private readonly ILogger<FSTEntries>? _logger;
 
-        public FSTEntries()
+        /// <summary>
+        /// Initializes a new <see cref="FSTEntries"/> tree with a root node.
+        /// </summary>
+        public FSTEntries(ILogger<FSTEntries>? logger = null)
         {
-            FSTEntry root = new FSTEntry();
-            entries.Add(root);
+            _logger = logger;
+            _entries = new List<FSTEntry> { new FSTEntry() };
+            _logger?.LogDebug("Initialized FSTEntries with root entry.");
         }
 
+        /// <summary>
+        /// Updates all entries and recalculates offsets.
+        /// </summary>
         public void Update()
         {
-            foreach (FSTEntry entry in entries)
+            foreach (var entry in _entries)
             {
                 entry.Update();
             }
@@ -26,42 +37,58 @@ namespace CNUSPACKER.fst
 
         private void UpdateDirRefs()
         {
-            if (entries.Count == 0)
-                return;
+            if (_entries.Count == 0) return;
 
-            FSTEntry root = entries[0];
+            var root = _entries[0];
             root.parentOffset = 0;
             root.nextOffset = FST.curEntryOffset;
-            FSTEntry lastdir = root.UpdateDirRefs();
-            if (lastdir != null)
+
+            var lastDir = root.UpdateDirRefs();
+            if (lastDir != null)
             {
-                lastdir.nextOffset = FST.curEntryOffset;
+                lastDir.nextOffset = FST.curEntryOffset;
+                _logger?.LogDebug("Set nextOffset on last directory to curEntryOffset ({Offset})", FST.curEntryOffset);
             }
         }
 
+        /// <summary>
+        /// Returns all <see cref="FSTEntry"/> objects belonging to a specific content block.
+        /// </summary>
         public List<FSTEntry> GetFSTEntriesByContent(Content content)
         {
-            return entries.SelectMany(entry => entry.GetFSTEntriesByContent(content)).ToList();
+            return _entries.SelectMany(e => e.GetFSTEntriesByContent(content)).ToList();
         }
 
+        /// <summary>
+        /// Gets the total count of FST entries in the tree.
+        /// </summary>
         public int GetFSTEntryCount()
         {
-            return entries.Sum(entry => entry.GetEntryCount());
+            return _entries.Sum(e => e.GetEntryCount());
         }
 
+        /// <summary>
+        /// Serializes all entries into a flat byte array.
+        /// </summary>
         public byte[] GetAsData()
         {
-            return entries.SelectMany(entry => entry.GetAsData()).ToArray();
+            return _entries.SelectMany(e => e.GetAsData()).ToArray();
         }
 
+        /// <summary>
+        /// Gets the byte size of the full serialized FST entry block.
+        /// </summary>
         public int GetDataSize()
         {
             return GetFSTEntryCount() * 0x10;
         }
 
+        /// <summary>
+        /// Gets the root entry.
+        /// </summary>
         public FSTEntry GetRootEntry()
         {
-            return entries[0];
+            return _entries[0];
         }
     }
 }

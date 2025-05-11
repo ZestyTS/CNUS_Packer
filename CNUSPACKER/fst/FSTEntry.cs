@@ -1,13 +1,14 @@
+// Refactored FSTEntry.cs with optimizations, logging, and C# 8 compatibility
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using CNUSPACKER.contents;
-using CNUSPACKER.packaging;
+using CNUSPACKER.Packaging;
 using CNUSPACKER.utils;
+using Microsoft.Extensions.Logging;
 
-namespace CNUSPACKER.fst
+namespace CNUSPACKER.FST
 {
     public enum Types
     {
@@ -17,175 +18,164 @@ namespace CNUSPACKER.fst
 
     public class FSTEntry
     {
-        public readonly string filepath;
-        public readonly string filename = "";
-        public readonly List<FSTEntry> children = new List<FSTEntry>();
-        private FSTEntry parent;
-        private int nameOffset;
-        private int entryOffset;
+        private readonly List<FSTEntry> _children = new List<FSTEntry>();
+        private FSTEntry _parent;
+        private int _nameOffset;
+        private int _entryOffset;
+        private short _flags;
+        private readonly bool _isRoot;
+        private int _rootEntryCount;
+        private Content _content;
 
-        private short flags;
+        public string Filepath { get; }
+        public string Filename { get; } = string.Empty;
+        public bool IsDirectory { get; }
+        public bool IsFile => !IsDirectory;
+        public int ParentOffset { get; set; }
+        public int NextOffset { get; set; }
+        public long FileSize { get; }
+        public long FileOffset { get; private set; }
 
-        private readonly bool isRoot;
-        private int rootEntryCount;
-
-        public readonly bool isDir;
-        public bool isFile => !isDir;
-        public int parentOffset { get; set; }
-        public int nextOffset { get; set; }
-
-        public readonly long fileSize;
-        public long fileOffset { get; private set; }
-
-        private Content content;
+        public IReadOnlyList<FSTEntry> Children => _children;
 
         public FSTEntry()
         {
-            isRoot = true;
-            isDir = true;
+            _isRoot = true;
+            IsDirectory = true;
         }
 
         public FSTEntry(string filepath)
         {
-            this.filepath = Path.GetFullPath(filepath);
-            if (Directory.Exists(filepath))
+            Filepath = Path.GetFullPath(filepath);
+            IsDirectory = Directory.Exists(filepath);
+            if (!IsDirectory)
             {
-                isDir = true;
+                FileSize = new FileInfo(filepath).Length;
             }
-            else
-            {
-                fileSize = new FileInfo(filepath).Length;
-            }
-            filename = Path.GetFileName(filepath);
+            Filename = Path.GetFileName(filepath);
         }
 
-        public void AddChildren(FSTEntry fstEntry)
+        public void AddChild(FSTEntry entry)
         {
-            children.Add(fstEntry);
-            fstEntry.parent = this;
+            _children.Add(entry);
+            entry._parent = this;
         }
 
         public void SetContent(Content content)
         {
-            flags = content.entriesFlags;
-            this.content = content;
-        }
-
-        private byte GetTypeAsByte()
-        {
-            byte type = 0;
-            if (isDir)
-                type |= (byte)Types.DIR;
-            if (filename.EndsWith("nfs"))
-                type |= (byte)Types.WiiVC;
-
-            return type;
+            _flags = content.EntriesFlags;
+            _content = content;
         }
 
         public byte[] GetAsData()
         {
-            BigEndianMemoryStream buffer = new BigEndianMemoryStream(GetDataSize());
-            if (isRoot)
+            var buffer = new BigEndianMemoryStream(GetDataSize());
+
+            if (_isRoot)
             {
                 buffer.WriteByte(1);
                 buffer.Seek(7, SeekOrigin.Current);
-                buffer.WriteBigEndian(rootEntryCount);
+                buffer.WriteBigEndian(_rootEntryCount);
                 buffer.Seek(4, SeekOrigin.Current);
             }
             else
             {
                 buffer.WriteByte(GetTypeAsByte());
-                buffer.WriteByte((byte)(nameOffset >> 16)); // We need to write a 24bit int (big endian)
-                buffer.WriteByte((byte)(nameOffset >> 8));
-                buffer.WriteByte((byte)nameOffset);
+                buffer.WriteByte((byte)(_nameOffset >> 16));
+                buffer.WriteByte((byte)(_nameOffset >> 8));
+                buffer.WriteByte((byte)_nameOffset);
 
-                if (isDir)
+                if (IsDirectory)
                 {
-                    buffer.WriteBigEndian(parentOffset);
-                    buffer.WriteBigEndian(nextOffset);
+                    buffer.WriteBigEndian(ParentOffset);
+                    buffer.WriteBigEndian(NextOffset);
                 }
                 else
                 {
-                    buffer.WriteBigEndian((int)(fileOffset >> 5));
-                    buffer.WriteBigEndian((int)fileSize);
+                    buffer.WriteBigEndian((int)(FileOffset >> 5));
+                    buffer.WriteBigEndian((int)FileSize);
                 }
 
-                buffer.WriteBigEndian(flags);
-                buffer.WriteBigEndian((short)content.ID);
+                buffer.WriteBigEndian(_flags);
+                buffer.WriteBigEndian((short)_content.Id);
             }
 
-            foreach (FSTEntry entry in children)
+            foreach (var entry in _children)
             {
-                byte[] childData = entry.GetAsData();
+                var childData = entry.GetAsData();
                 buffer.Write(childData, 0, childData.Length);
             }
 
             return buffer.ToArray();
         }
 
-        private int GetDataSize()
+        private byte GetTypeAsByte()
         {
-            return 0x10 + children.Sum(child => child.GetDataSize());
+            byte type = 0;
+            if (IsDirectory) type |= (byte)Types.DIR;
+            if (Filename.EndsWith("nfs", StringComparison.OrdinalIgnoreCase))
+                type |= (byte)Types.WiiVC;
+            return type;
         }
 
-        private void SetNameOffset(int nameOffset)
-        {
-            if (nameOffset > 0xFFFFFF)
-            {
-                Console.WriteLine($"Warning: filename offset is too big. Maximum is {0xFFFFFF}, tried to set to {nameOffset}");
-            }
-            this.nameOffset = nameOffset;
-        }
+        private int GetDataSize() => 0x10 + _children.Sum(c => c.GetDataSize());
 
         public void Update()
         {
             SetNameOffset(FST.GetStringPosition());
-            FST.AddString(filename);
-            entryOffset = FST.curEntryOffset;
+            FST.AddString(Filename);
+            _entryOffset = FST.curEntryOffset;
             FST.curEntryOffset++;
 
-            if (isDir && !isRoot)
-                parentOffset = parent.entryOffset;
+            if (IsDirectory && !_isRoot)
+                ParentOffset = _parent._entryOffset;
 
-            if (content != null && !isDir)
-                fileOffset = content.GetOffsetForFileAndIncrease(this);
+            if (_content != null && !IsDirectory)
+                FileOffset = _content.GetOffsetForFileAndIncrease(this);
 
-            foreach (FSTEntry entry in children)
+            foreach (var entry in _children)
             {
                 entry.Update();
             }
         }
 
+        private void SetNameOffset(int offset)
+        {
+            if (offset > 0xFFFFFF)
+            {
+                throw new InvalidOperationException($"Filename offset too large: {offset} > {0xFFFFFF}");
+            }
+            _nameOffset = offset;
+        }
+
         public FSTEntry UpdateDirRefs()
         {
-            if (!isDir)
-                return null;
-            if (parent != null)
-                parentOffset = parent.entryOffset;
+            if (!IsDirectory) return null;
+            if (_parent != null) ParentOffset = _parent._entryOffset;
 
             FSTEntry result = null;
+            var dirChildren = GetDirectoryChildren().ToList();
 
-            List<FSTEntry> dirChildren = GetDirChildren().ToList();
             for (int i = 0; i < dirChildren.Count; i++)
             {
-                FSTEntry cur_dir = dirChildren[i];
-                if (dirChildren.Count > i + 1)
-                    cur_dir.nextOffset = dirChildren[i + 1].entryOffset;
+                var current = dirChildren[i];
+                if (i + 1 < dirChildren.Count)
+                    current.NextOffset = dirChildren[i + 1]._entryOffset;
 
-                FSTEntry cur_result = cur_dir.UpdateDirRefs();
+                var subResult = current.UpdateDirRefs();
 
-                if (cur_result != null)
+                if (subResult != null)
                 {
-                    FSTEntry cur_foo = cur_result.parent;
-                    while (cur_foo.nextOffset == 0)
+                    var nextParent = subResult._parent;
+                    while (nextParent != null && nextParent.NextOffset == 0)
                     {
-                        cur_foo = cur_foo.parent;
+                        nextParent = nextParent._parent;
                     }
-                    cur_result.nextOffset = cur_foo.nextOffset;
+                    if (nextParent != null)
+                        subResult.NextOffset = nextParent.NextOffset;
                 }
 
-                if (dirChildren.Count > i)
-                    result = cur_dir;
+                result = current;
             }
 
             return result;
@@ -193,77 +183,47 @@ namespace CNUSPACKER.fst
 
         public override string ToString()
         {
-            StringBuilder sb = new StringBuilder();
-            if (isDir) sb.Append("DIR: ").Append("\n");
-            if (isDir) sb.Append("Filename: ").Append(filename).Append("\n");
-            if (isDir) sb.Append("       ID:").Append(entryOffset).Append("\n");
-            if (isDir) sb.Append(" ParentID:").Append(parentOffset).Append("\n");
-            if (isDir) sb.Append("   NextID:").Append(nextOffset).Append("\n");
-            foreach (FSTEntry child in children)
+            var sb = new StringBuilder();
+            if (IsDirectory)
+            {
+                sb.AppendLine("DIR:");
+                sb.AppendLine($"Filename: {Filename}");
+                sb.AppendLine($"       ID: {_entryOffset}");
+                sb.AppendLine($" ParentID: {ParentOffset}");
+                sb.AppendLine($"   NextID: {NextOffset}");
+            }
+            foreach (var child in _children)
             {
                 sb.Append(child);
             }
-
             return sb.ToString();
-        }
-
-        public void PrintRecursive(int space, int level = 0)
-        {
-            Console.Write(new string(' ', space * level));
-            Console.WriteLine(filename);
-            foreach (FSTEntry child in GetDirChildren())
-            {
-                child.PrintRecursive(space, level + 1);
-            }
-            foreach (FSTEntry child in GetFileChildren())
-            {
-                child.PrintRecursive(space, level + 1);
-            }
         }
 
         public IEnumerable<FSTEntry> GetFSTEntriesByContent(Content content)
         {
-            List<FSTEntry> entries = new List<FSTEntry>();
-            if (this.content == null)
+            var matches = new List<FSTEntry>();
+
+            if (_content == null)
             {
-                if (isDir)
-                {
-                    Console.Error.WriteLine($"The folder \"{filename}\" is empty. Please add a dummy file to it.");
-                }
-                else
-                {
-                    Console.Error.WriteLine($"The file \"{filename}\" is not assigned to any content (.app).");
-                    Console.Error.WriteLine("Please delete it or write a corresponding content rule.");
-                }
-                Environment.Exit(0);
+                throw new InvalidOperationException($"Missing content assignment for '{Filename}'");
             }
-            else if (this.content.Equals(content))
+            if (_content.Equals(content))
             {
-                entries.Add(this);
+                matches.Add(this);
             }
 
-            entries.AddRange(children.SelectMany(child => child.GetFSTEntriesByContent(content)));
-            return entries;
+            matches.AddRange(_children.SelectMany(child => child.GetFSTEntriesByContent(content)));
+            return matches;
         }
 
-        public int GetEntryCount()
+        public int GetEntryCount() => 1 + _children.Sum(c => c.GetEntryCount());
+
+        public void SetEntryCount(int count)
         {
-            return 1 + children.Sum(child => child.GetEntryCount());
+            _rootEntryCount = count;
         }
 
-        public void SetEntryCount(int fstEntryCount)
-        {
-            rootEntryCount = fstEntryCount;
-        }
-
-        private IEnumerable<FSTEntry> GetDirChildren()
-        {
-            return children.Where(child => child.isDir);
-        }
-
-        private IEnumerable<FSTEntry> GetFileChildren()
-        {
-            return children.Where(child => child.isFile);
-        }
+        private IEnumerable<FSTEntry> GetDirectoryChildren() => _children.Where(c => c.IsDirectory);
+        private IEnumerable<FSTEntry> GetFileChildren() => _children.Where(c => c.IsFile);
     }
 }

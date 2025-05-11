@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using CNUSPACKER.crypto;
+using CNUSPACKER.Crypto;
 using CNUSPACKER.Models;
-using CNUSPACKER.packaging;
-using CNUSPACKER.utils;
+using CNUSPACKER.Packaging;
+using CNUSPACKER.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace CNUSPACKER
@@ -35,11 +35,11 @@ namespace CNUSPACKER
 
             var appInfo = new AppXMLInfo
             {
-                titleID = options.TitleID,
-                groupID = (short)(options.TitleID >> 8),
-                appType = options.AppType,
-                osVersion = options.OSVersion,
-                titleVersion = options.TitleVersion
+                TitleID = options.TitleID,
+                GroupID = (short)(options.TitleID >> 8),
+                AppType = options.AppType,
+                OSVersion = options.OSVersion,
+                TitleVersion = options.TitleVersion
             };
 
             string encryptionKey = ValidateOrFallbackKey(options.EncryptionKey, Settings.defaultEncryptionKey, "encryptionKey");
@@ -70,8 +70,8 @@ namespace CNUSPACKER
                 _logger.LogInformation("XML parsing was skipped by request.");
             }
 
-            long parentID = appInfo.titleID & ~0x0000000F00000000L;
-            short contentGroup = appInfo.groupID;
+            long parentID = appInfo.TitleID & ~0x0000000F00000000L;
+            short contentGroup = appInfo.GroupID;
             var rules = ContentRule.GetCommonRules(contentGroup, parentID);
 
             Directory.CreateDirectory(Settings.tmpDir);
@@ -81,7 +81,7 @@ namespace CNUSPACKER
             nuspackage.PackContents(options.OutputPath);
             nuspackage.PrintTicketInfos();
 
-            Utils.DeleteDir(Settings.tmpDir);
+            Utils.Utils.DeleteDir(Settings.tmpDir);
         }
 
         private string ValidateOrFallbackKey(string key, string fallback, string name)

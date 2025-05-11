@@ -1,6 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using CNUSPACKER.Crypto;
 using CNUSPACKER.Models;
 using CNUSPACKER.Packaging;
@@ -15,21 +15,24 @@ namespace CNUSPACKER
     public class CnusPackagerRunner
     {
         private readonly ILogger<CnusPackagerRunner> _logger;
-
+        private readonly ILoggerFactory _loggerFactory;
         /// <summary>
         /// Creates a new instance of the packager runner.
         /// </summary>
         /// <param name="logger">Logger used for diagnostic and status output.</param>
-        public CnusPackagerRunner(ILogger<CnusPackagerRunner> logger)
+        /// <param name="loggerFactory">Used for dianostic and status output.</param>
+
+        public CnusPackagerRunner(ILogger<CnusPackagerRunner> logger, ILoggerFactory loggerFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         }
 
         /// <summary>
         /// Executes the packager using the given options.
         /// </summary>
         /// <param name="options">Settings and input values to use.</param>
-        public void Run(CnusPackagerOptions options)
+        public async Task RunAsync(CnusPackagerOptions options)
         {
             ValidateInputFolders(options.InputPath);
 
@@ -43,7 +46,7 @@ namespace CNUSPACKER
             };
 
             string encryptionKey = ValidateOrFallbackKey(options.EncryptionKey, Settings.defaultEncryptionKey, "encryptionKey");
-            string encryptKeyWith = ValidateOrFallbackKey(options.EncryptKeyWith, LoadEncryptWithKey(), "encryptKeyWith");
+            string encryptKeyWith = ValidateOrFallbackKey(options.EncryptKeyWith, await LoadEncryptWithKeyAsync(), "encryptKeyWith");
 
             if (string.IsNullOrWhiteSpace(encryptKeyWith) || encryptKeyWith.Length != 32)
             {
@@ -62,7 +65,8 @@ namespace CNUSPACKER
                 }
                 catch (Exception e)
                 {
-                    _logger.LogError(e, $"Error parsing app.xml: {Settings.pathToAppXml}");
+                    _logger.LogError(e, "Error parsing app.xml: {Path}", Settings.pathToAppXml);
+
                 }
             }
             else
@@ -77,8 +81,8 @@ namespace CNUSPACKER
             Directory.CreateDirectory(Settings.tmpDir);
 
             var config = new NusPackageConfiguration(options.InputPath, appInfo, new Key(encryptionKey), new Key(encryptKeyWith), rules);
-            var nuspackage = NUSPackageFactory.CreateNewPackage(config);
-            nuspackage.PackContents(options.OutputPath);
+            var nuspackage = await NUSPackageFactory.CreateNewPackageAsync(config, _loggerFactory);
+            await nuspackage.PackContentsAsync(options.OutputPath);
             nuspackage.PrintTicketInfos();
 
             Utils.Utils.DeleteDir(Settings.tmpDir);
@@ -104,7 +108,7 @@ namespace CNUSPACKER
             }
         }
 
-        private string LoadEncryptWithKey()
+        private async Task<string> LoadEncryptWithKeyAsync()
         {
             if (!File.Exists(Settings.encryptWithFile))
                 return "";
@@ -112,7 +116,7 @@ namespace CNUSPACKER
             try
             {
                 using var reader = new StreamReader(Settings.encryptWithFile);
-                return reader.ReadLine() ?? "";
+                return await reader.ReadLineAsync() ?? "";
             }
             catch (Exception ex)
             {

@@ -1,7 +1,6 @@
 using System.IO;
 using System.Security.Cryptography;
-using CNUSPACKER.Crypto;
-using CNUSPACKER.Packaging;
+using System.Threading.Tasks;
 using CNUSPACKER.Utils;
 using Microsoft.Extensions.Logging;
 
@@ -28,9 +27,9 @@ namespace CNUSPACKER.Crypto
             _logger = logger;
         }
 
-        public void EncryptFileWithPadding(Packaging.FST fst, string outputFilename, short contentId, int blockSize)
+        public async Task EncryptFileWithPaddingAsync(Packaging.FST fst, string outputFilename, short contentId, int blockSize)
         {
-            using (FileStream output = new FileStream(outputFilename, FileMode.Create))
+            using (FileStream output = new FileStream(outputFilename, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true))
             {
                 var input = new MemoryStream(fst.GetAsData());
                 var ivStream = new BigEndianMemoryStream(0x10);
@@ -38,21 +37,21 @@ namespace CNUSPACKER.Crypto
                 var iv = new IV(ivStream.GetBuffer());
 
                 _logger?.LogInformation("Encrypting FST to {Output}", outputFilename);
-                EncryptSingleFile(input, output, fst.GetDataSize(), iv, blockSize);
+                await EncryptSingleFileAsync(input, output, fst.GetDataSize(), iv, blockSize);
             }
         }
 
-        public void EncryptFileWithPadding(FileStream input, int contentId, FileStream output, int blockSize)
+        public async Task EncryptFileWithPaddingAsync(FileStream input, int contentId, FileStream output, int blockSize)
         {
             var ivStream = new BigEndianMemoryStream(0x10);
             ivStream.WriteBigEndian((short)contentId);
             var iv = new IV(ivStream.GetBuffer());
 
             _logger?.LogInformation("Encrypting file stream with padding. ContentID={ContentId}", contentId);
-            EncryptSingleFile(input, output, input.Length, iv, blockSize);
+            await EncryptSingleFileAsync(input, output, input.Length, iv, blockSize);
         }
 
-        private void EncryptSingleFile(Stream input, Stream output, long inputLength, IV iv, int blockSize)
+        private async Task EncryptSingleFileAsync(Stream input, Stream output, long inputLength, IV iv, int blockSize)
         {
             _aes.IV = iv.iv;
             long targetSize = Utils.Utils.Align(inputLength, blockSize);
@@ -61,12 +60,12 @@ namespace CNUSPACKER.Crypto
             do
             {
                 byte[] blockBuffer = new byte[blockSize];
-                int bytesRead = input.Read(blockBuffer, 0, blockSize);
+                int bytesRead = await input.ReadAsync(blockBuffer, 0, blockSize);
                 if (bytesRead == 0) break;
 
                 byte[] encryptedBlock = Encrypt(blockBuffer);
                 _aes.IV = Utils.Utils.CopyOfRange(encryptedBlock, blockSize - 16, blockSize);
-                output.Write(encryptedBlock, 0, bytesRead);
+                await output.WriteAsync(encryptedBlock, 0, bytesRead);
                 curPosition += bytesRead;
 
                 if (curPosition % (blockSize * 100) == 0)
@@ -79,12 +78,12 @@ namespace CNUSPACKER.Crypto
             _logger?.LogInformation("File encryption completed: {Bytes} bytes", curPosition);
         }
 
-        public void EncryptFileHashed(FileStream input, int contentId, FileStream output, ContentHashes hashes)
+        public async Task EncryptFileHashedAsync(FileStream input, int contentId, FileStream output, ContentHashes hashes)
         {
-            EncryptFileHashed(input, output, input.Length, contentId, hashes);
+            await EncryptFileHashedAsync(input, output, input.Length, contentId, hashes);
         }
 
-        private void EncryptFileHashed(Stream input, Stream output, long length, int contentId, ContentHashes hashes)
+        private async Task EncryptFileHashedAsync(Stream input, Stream output, long length, int contentId, ContentHashes hashes)
         {
             const int hashBlockSize = 0xFC00;
             byte[] buffer = new byte[hashBlockSize];
@@ -93,9 +92,9 @@ namespace CNUSPACKER.Crypto
 
             do
             {
-                read = input.Read(buffer, 0, hashBlockSize);
+                read = await input.ReadAsync(buffer, 0, hashBlockSize);
                 byte[] encryptedData = EncryptChunkHashed(buffer, block, hashes, contentId);
-                output.Write(encryptedData, 0, encryptedData.Length);
+                await output.WriteAsync(encryptedData, 0, encryptedData.Length);
 
                 block++;
                 if (block % 100 == 0)

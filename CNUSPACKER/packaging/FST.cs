@@ -14,10 +14,10 @@ namespace CNUSPACKER.Packaging
         private const int HeaderPadding = 0x20;
 
         private readonly Contents _contents;
-        private readonly FSTEntries _fileEntries = new FSTEntries();
+        private readonly FSTEntries _fileEntries;
+        private readonly MemoryStream _strings = new MemoryStream();
 
-        private static readonly MemoryStream Strings = new MemoryStream();
-        public static int CurEntryOffset { get; set; }
+        public int CurEntryOffset { get; set; }
 
         public Contents Contents => _contents;
         public FSTEntries FileEntries => _fileEntries;
@@ -25,6 +25,7 @@ namespace CNUSPACKER.Packaging
         public FST(Contents contents)
         {
             _contents = contents;
+            _fileEntries = new FSTEntries(this); // Pass reference to this instance
         }
 
         /// <summary>
@@ -38,12 +39,12 @@ namespace CNUSPACKER.Packaging
             _fileEntries.GetRootEntry().SetEntryCount(_fileEntries.GetFSTEntryCount());
         }
 
-        public static int GetStringPosition() => (int)Strings.Position;
+        public int GetStringPosition() => (int)_strings.Position;
 
-        public static void AddString(string filename)
+        public void AddString(string filename)
         {
-            Strings.Write(Encoding.ASCII.GetBytes(filename), 0, filename.Length);
-            Strings.WriteByte(0x00);
+            _strings.Write(Encoding.ASCII.GetBytes(filename), 0, filename.Length);
+            _strings.WriteByte(0x00);
         }
 
         /// <summary>
@@ -60,7 +61,7 @@ namespace CNUSPACKER.Packaging
 
             buffer.Write(_contents.GetFstContentHeaderAsData(), 0, _contents.GetFstContentHeaderAsData().Length);
             buffer.Write(_fileEntries.GetAsData(), 0, _fileEntries.GetAsData().Length);
-            buffer.Write(Strings.ToArray(), 0, (int)Strings.Length);
+            buffer.Write(_strings.ToArray(), 0, (int)_strings.Length);
 
             return buffer.GetBuffer();
         }
@@ -75,7 +76,7 @@ namespace CNUSPACKER.Packaging
             size += 4 + 4 + 20;                // Padding fields
             size += _contents.GetFstContentHeaderDataSize();
             size += _fileEntries.GetDataSize();
-            size += (int)Strings.Position;
+            size += (int)_strings.Position;
 
             return (int)Utils.Utils.Align(size, 0x8000);
         }

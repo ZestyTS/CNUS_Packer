@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using CNUSPACKER.FST;
@@ -42,7 +41,7 @@ namespace CNUSPACKER.Packaging
                 }
                 else
                 {
-                    _curContent = targetContents.GetNewContent(rule.Details);
+                    _curContent = targetContents.CreateNewContent(rule.Details);
                     _curContentFirst = _curContent;
                     _curContentSize = 0L;
 
@@ -64,12 +63,12 @@ namespace CNUSPACKER.Packaging
 
             if (current.Children.Count == 0 && regex.IsMatch(path))
             {
-                result = contents.GetNewContent(details);
+                result = contents.CreateNewContent(details);
             }
 
             foreach (var child in current.Children)
             {
-                if (child.IsDir)
+                if (child.IsDirectory)
                 {
                     result = SetNewContentRecursive(path, child, contents, details, regex) ?? result;
                 }
@@ -78,8 +77,8 @@ namespace CNUSPACKER.Packaging
                     var fullPath = path + child.Filename;
                     if (regex.IsMatch(fullPath))
                     {
-                        var assigned = contents.GetNewContent(details);
-                        _logger.LogDebug("Assigned content {ContentId:X} to: {Path}", assigned.ID, fullPath);
+                        var assigned = contents.CreateNewContent(details);
+                        _logger.LogDebug("Assigned content {ContentId:X} to: {Path}", assigned.Id, fullPath);
                         child.SetContent(assigned);
                         result = assigned;
                     }
@@ -99,14 +98,14 @@ namespace CNUSPACKER.Packaging
 
             if (current.Children.Count == 0 && regex.IsMatch(path))
             {
-                _logger.LogDebug("Assigned content {ContentId:X} ({Offset:X},{Size:X}) to: {Path}", _curContent.ID, _curContentSize, current.FileSize, path);
+                _logger.LogDebug("Assigned content {ContentId:X} ({Offset:X},{Size:X}) to: {Path}", _curContent.Id, _curContentSize, current.FileSize, path);
                 current.SetContent(_curContent);
                 return true;
             }
 
             foreach (var child in current.Children)
             {
-                if (child.IsDir)
+                if (child.IsDirectory)
                 {
                     matchFound |= SetContentRecursive(path, child, contents, details, regex);
                 }
@@ -118,12 +117,12 @@ namespace CNUSPACKER.Packaging
                         if (_curContentSize + child.FileSize > MaxContentLength)
                         {
                             _logger.LogInformation("Splitting content due to size limit. Creating new content block.");
-                            _curContent = contents.GetNewContent(details);
+                            _curContent = contents.CreateNewContent(details);
                             _curContentSize = 0;
                         }
 
                         _curContentSize += child.FileSize;
-                        _logger.LogDebug("Assigned content {ContentId:X} ({Offset:X},{Size:X}) to: {Path}", _curContent.ID, _curContentSize, child.FileSize, fullPath);
+                        _logger.LogDebug("Assigned content {ContentId:X} ({Offset:X},{Size:X}) to: {Path}", _curContent.Id, _curContentSize, child.FileSize, fullPath);
                         child.SetContent(_curContent);
                         matchFound = true;
                     }

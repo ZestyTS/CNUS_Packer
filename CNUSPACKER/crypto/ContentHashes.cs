@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using CNUSPACKER.Packaging;
 using CNUSPACKER.Utils;
 using Microsoft.Extensions.Logging;
@@ -16,33 +17,40 @@ namespace CNUSPACKER.Crypto
 
         private readonly ILogger<ContentHashes> _logger;
 
-        public byte[] TMDHash { get; }
+        public byte[] TMDHash { get; private set; }
         private int _blockCount;
 
-        public ContentHashes(string file, bool hashed, ILogger<ContentHashes> logger = null)
+        private ContentHashes(ILogger<ContentHashes> logger = null)
         {
             _logger = logger;
+        }
+
+        public static async Task<ContentHashes> CreateAsync(string file, bool hashed, ILogger<ContentHashes> logger = null)
+        {
+            var instance = new ContentHashes(logger);
 
             if (hashed)
             {
-                _logger?.LogInformation("Calculating hierarchical SHA1 hashes for {File}.", file);
-                CalculateH0Hashes(file);
-                CalculateOtherHashes(1, _h0Hashes, _h1Hashes);
-                CalculateOtherHashes(2, _h1Hashes, _h2Hashes);
-                CalculateOtherHashes(3, _h2Hashes, _h3Hashes);
-                TMDHash = HashUtil.HashSHA1(GetH3Hashes());
-                _logger?.LogInformation("TMD hash calculation complete.");
+                logger?.LogInformation("Calculating hierarchical SHA1 hashes for {File}.", file);
+                await instance.CalculateH0HashesAsync(file);
+                instance.CalculateOtherHashes(1, instance._h0Hashes, instance._h1Hashes);
+                instance.CalculateOtherHashes(2, instance._h1Hashes, instance._h2Hashes);
+                instance.CalculateOtherHashes(3, instance._h2Hashes, instance._h3Hashes);
+                instance.TMDHash = HashUtil.HashSHA1(instance.GetH3Hashes());
+                logger?.LogInformation("TMD hash calculation complete.");
             }
             else
             {
-                _logger?.LogInformation("Calculating SHA1 hash directly for {File}.", file);
-                TMDHash = HashUtil.HashSHA1(file, Content.ContentFilePadding);
+                logger?.LogInformation("Calculating SHA1 hash directly for {File}.", file);
+                instance.TMDHash = HashUtil.HashSHA1(file, Content.ContentFilePadding);
             }
+
+            return instance;
         }
 
-        private void CalculateH0Hashes(string file)
+        private async Task CalculateH0HashesAsync(string file)
         {
-            using (var input = new FileStream(file, FileMode.Open))
+            using (var input = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true))
             {
                 const int bufferSize = 0xFC00;
                 byte[] buffer = new byte[bufferSize];
@@ -50,7 +58,7 @@ namespace CNUSPACKER.Crypto
 
                 for (int block = 0; block < totalBlocks; block++)
                 {
-                    input.Read(buffer, 0, bufferSize);
+                    int read = await input.ReadAsync(buffer, 0, bufferSize);
                     _h0Hashes[block] = HashUtil.HashSHA1(buffer);
 
                     if (block % 100 == 0)
@@ -124,15 +132,15 @@ namespace CNUSPACKER.Crypto
             return output.GetBuffer();
         }
 
-        public void SaveH3ToFile(string path)
+        public async Task SaveH3ToFileAsync(string path)
         {
-            if (_h3Hashes.Count == 0) 
+            if (_h3Hashes.Count == 0)
                 return;
 
-            using (var fs = new FileStream(path, FileMode.Create))
+            using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true))
             {
                 var h3 = GetH3Hashes();
-                fs.Write(h3, 0, h3.Length);
+                await fs.WriteAsync(h3, 0, h3.Length);
                 _logger?.LogInformation("H3 hash file saved to {Path}.", path);
             }
         }

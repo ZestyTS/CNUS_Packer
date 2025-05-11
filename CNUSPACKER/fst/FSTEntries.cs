@@ -12,14 +12,16 @@ namespace CNUSPACKER.FST
     {
         private readonly List<FSTEntry> _entries;
         private readonly ILogger<FSTEntries>? _logger;
+        private readonly FST _fst;
 
         /// <summary>
         /// Initializes a new <see cref="FSTEntries"/> tree with a root node.
         /// </summary>
-        public FSTEntries(ILogger<FSTEntries>? logger = null)
+        public FSTEntries(FST fst, ILogger<FSTEntries>? logger = null)
         {
+            _fst = fst;
             _logger = logger;
-            _entries = new List<FSTEntry> { new FSTEntry() };
+            _entries = new List<FSTEntry> { new FSTEntry(fst) };
             _logger?.LogDebug("Initialized FSTEntries with root entry.");
         }
 
@@ -40,14 +42,14 @@ namespace CNUSPACKER.FST
             if (_entries.Count == 0) return;
 
             var root = _entries[0];
-            root.parentOffset = 0;
-            root.nextOffset = FST.curEntryOffset;
+            root.ParentOffset = 0;
+            root.NextOffset = _fst.CurEntryOffset;
 
             var lastDir = root.UpdateDirRefs();
             if (lastDir != null)
             {
-                lastDir.nextOffset = FST.curEntryOffset;
-                _logger?.LogDebug("Set nextOffset on last directory to curEntryOffset ({Offset})", FST.curEntryOffset);
+                lastDir.NextOffset = _fst.CurEntryOffset;
+                _logger?.LogDebug("Set nextOffset on last directory to curEntryOffset ({Offset})", _fst.CurEntryOffset);
             }
         }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using CNUSPACKER.Crypto;
 using CNUSPACKER.FST;
 using CNUSPACKER.Utils;
@@ -31,6 +32,7 @@ namespace CNUSPACKER.Packaging
         private readonly long _parentTitleId;
         private readonly bool _isFstContent;
         private readonly ILogger<Content>? _logger;
+        private readonly ILoggerFactory? _loggerFactory;
 
         public int Id { get; }
         public long EncryptedFileSize { get; set; }
@@ -39,7 +41,7 @@ namespace CNUSPACKER.Packaging
 
         private bool IsHashed => (_type & TypeHashed) == TypeHashed;
 
-        public Content(int id, short index, short entriesFlags, int groupId, long parentTitleId, bool isHashed, bool isFstContent, ILogger<Content>? logger = null)
+        public Content(int id, short index, short entriesFlags, int groupId, long parentTitleId, bool isHashed, bool isFstContent, ILogger<Content>? logger = null, ILoggerFactory loggerFactory = null)
         {
             Id = id;
             _index = index;
@@ -48,9 +50,11 @@ namespace CNUSPACKER.Packaging
             _parentTitleId = parentTitleId;
             _isFstContent = isFstContent;
             _logger = logger;
+            _loggerFactory = loggerFactory;
 
             if (isHashed)
                 _type |= TypeHashed;
+            _loggerFactory = loggerFactory;
         }
 
         public KeyValuePair<long, byte[]> GetFSTContentHeaderAsData(long oldContentOffset)
@@ -116,37 +120,33 @@ namespace CNUSPACKER.Packaging
             return buffer.GetBuffer();
         }
 
-        public void PackContentToFile(string outputDir, Encryption encryption)
+        public async Task PackContentToFileAsync(string outputDir, Encryption encryption)
         {
             _logger?.LogInformation("Packing content {Id:X8}", Id);
 
             string decryptedFile = PackDecrypted();
             _logger?.LogInformation("Generating hashes");
-            var contentHashes = new ContentHashes(decryptedFile, IsHashed);
+            var contentHashes = await ContentHashes.CreateAsync(decryptedFile, IsHashed, _loggerFactory?.CreateLogger<ContentHashes>());
             string h3Path = Path.Combine(outputDir, $"{Id:X8}.h3");
-            contentHashes.SaveH3ToFile(h3Path);
+            await contentHashes.SaveH3ToFileAsync(h3Path);
             Sha1 = contentHashes.TMDHash;
 
             _logger?.LogInformation("Encrypting content {Id:X8}", Id);
             string outputFilePath = Path.Combine(outputDir, $"{Id:X8}.app");
-            EncryptedFileSize = PackEncrypted(decryptedFile, outputFilePath, contentHashes, encryption);
+            EncryptedFileSize = await PackEncryptedAsync(decryptedFile, outputFilePath, contentHashes, encryption);
 
             _logger?.LogInformation("Content {Id:X8} packed to file \"{FileName}\"", Id, $"{Id:X8}.app");
         }
 
-        private long PackEncrypted(string decryptedFile, string outputFilePath, ContentHashes hashes, Encryption encryption)
+        private async Task<long> PackEncryptedAsync(string decryptedFile, string outputFilePath, ContentHashes hashes, Encryption encryption)
         {
             using var input = new FileStream(decryptedFile, FileMode.Open);
             using var output = new FileStream(outputFilePath, FileMode.Create);
 
             if (IsHashed)
-            {
-                encryption.EncryptFileHashed(input, Id, output, hashes);
-            }
+                await encryption.EncryptFileHashedAsync(input, Id, output, hashes);
             else
-            {
-                encryption.EncryptFileWithPadding(input, Id, output, ContentFilePadding);
-            }
+                await encryption.EncryptFileWithPaddingAsync(input, Id, output, ContentFilePadding);
 
             return output.Length;
         }

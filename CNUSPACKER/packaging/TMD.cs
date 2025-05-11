@@ -1,6 +1,5 @@
-// Refactored TMD.cs for clarity, structure, and documentation
 using System.IO;
-using CNUSPACKER.Contents;
+using System.Threading.Tasks;
 using CNUSPACKER.Crypto;
 using CNUSPACKER.Models;
 using CNUSPACKER.Utils;
@@ -14,7 +13,7 @@ namespace CNUSPACKER.Packaging
     {
         private const int SignatureType = 0x00010004;
         private readonly byte[] _signature = new byte[0x100];
-        private static readonly byte[] Issuer = Utils.HexStringToByteArray("526F6F742D434130303030303030332D435030303030303030620000000000000000000000000000000000000000000000000000000000000000000000000000");
+        private static readonly byte[] Issuer = Utils.Utils.HexStringToByteArray("526F6F742D434130303030303030332D435030303030303030620000000000000000000000000000000000000000000000000000000000000000000000000000");
 
         private const byte Version = 0x01;
         private const byte CACRLVersion = 0x00;
@@ -34,7 +33,7 @@ namespace CNUSPACKER.Packaging
         private readonly Contents _contents;
         private readonly Ticket _ticket;
 
-        public TMD(AppXMLInfo appInfo, FST.FST fst, Ticket ticket)
+        public TMD(AppXMLInfo appInfo, FST fst, Ticket ticket)
         {
             _groupID = appInfo.GroupID;
             _systemVersion = appInfo.OSVersion;
@@ -45,7 +44,7 @@ namespace CNUSPACKER.Packaging
             _contentCount = _contents.GetContentCount();
             contentInfo = new ContentInfo(_contentCount)
             {
-                SHA2Hash = HashUtil.HashSHA2(_contents.GetAsData())
+                Sha2Hash = HashUtil.HashSHA2(_contents.GetAsData())
             };
         }
 
@@ -54,9 +53,9 @@ namespace CNUSPACKER.Packaging
             _sha2 = HashUtil.HashSHA2(contentInfo.GetAsData());
         }
 
-        public byte[] GetAsData()
+        public async Task<byte[]> GetAsDataAsync()
         {
-            var buffer = new BigEndianMemoryStream(GetDataSize());
+            using var buffer = new BigEndianMemoryStream(GetDataSize());
 
             buffer.WriteBigEndian(SignatureType);
             buffer.Write(_signature, 0, _signature.Length);
@@ -81,8 +80,8 @@ namespace CNUSPACKER.Packaging
             buffer.Seek(2, SeekOrigin.Current);
 
             buffer.Write(_sha2, 0, _sha2.Length);
-            buffer.Write(contentInfo.GetAsData(), 0, ContentInfo.staticDataSize * 0x40);
-            buffer.Write(_contents.GetAsData(), 0, _contents.GetDataSize());
+            await buffer.WriteAsync(contentInfo.GetAsData(), 0, ContentInfo.StaticDataSize * 0x40);
+            await buffer.WriteAsync(_contents.GetAsData(), 0, _contents.GetDataSize());
 
             return buffer.GetBuffer();
         }
@@ -90,7 +89,7 @@ namespace CNUSPACKER.Packaging
         private int GetDataSize()
         {
             const int StaticSize = 0x204;
-            const int ContentInfoSize = 0x40 * ContentInfo.staticDataSize;
+            const int ContentInfoSize = 0x40 * ContentInfo.StaticDataSize;
             int contentsSize = _contents.GetDataSize();
 
             return StaticSize + ContentInfoSize + contentsSize;

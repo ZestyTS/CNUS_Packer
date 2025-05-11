@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using CNUSPACKER.Crypto;
 using CNUSPACKER.FST;
 
@@ -76,15 +77,11 @@ namespace CNUSPACKER.Packaging
             }
         }
 
-        public void PackContents(string outputDir, Encryption encryption)
+        public async Task PackContentsAsync(string outputDir, Encryption encryption)
         {
             foreach (var content in _contents)
-            {
                 if (!content.Equals(FstContent))
-                {
-                    content.PackContentToFile(outputDir, encryption);
-                }
-            }
+                    await content.PackContentToFileAsync(outputDir, encryption);
         }
 
         public void DeleteContent(Content content)

@@ -24,10 +24,10 @@ namespace CNUSPACKER.Packaging
             };
 
             using var buffer = new MemoryStream(0xA00);
-            foreach (var entry in certData)
+            foreach (var (Offset, Hex) in certData)
             {
-                buffer.Seek(entry.Offset, SeekOrigin.Begin);
-                byte[] data = Utils.HexStringToByteArray(entry.Hex);
+                buffer.Seek(Offset, SeekOrigin.Begin);
+                byte[] data = Utils.Utils.HexStringToByteArray(Hex);
                 buffer.Write(data, 0, data.Length);
             }
 

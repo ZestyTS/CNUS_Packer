@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using CNUSPACKER.Crypto;
+using CNUSPACKER.Configuration;
 using CNUSPACKER.FST;
 using CNUSPACKER.Utils;
 using Microsoft.Extensions.Logging;
@@ -153,7 +154,7 @@ namespace CNUSPACKER.Packaging
 
         private string PackDecrypted()
         {
-            string tmpPath = Path.Combine(Settings.tmpDir, $"{Id:X8}.dec");
+            string tmpPath = Path.Combine(Settings.Default.TmpDir, $"{Id:X8}.dec");
             using var fos = new FileStream(tmpPath, FileMode.Create);
             int totalCount = _entries.Count;
             int fileIndex = 1;

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using CNUSPACKER.Crypto;
+using CNUSPACKER.Configuration;
 using CNUSPACKER.Models;
 using CNUSPACKER.Packaging;
 using CNUSPACKER.Utils;
@@ -45,18 +46,18 @@ namespace CNUSPACKER
                 TitleVersion = options.TitleVersion
             };
 
-            string encryptionKey = ValidateOrFallbackKey(options.EncryptionKey, Settings.defaultEncryptionKey, "encryptionKey");
+            string encryptionKey = ValidateOrFallbackKey(options.EncryptionKey, Settings.Default.DefaultEncryptWithKey, "encryptionKey");
             string encryptKeyWith = ValidateOrFallbackKey(options.EncryptKeyWith, await LoadEncryptWithKeyAsync(), "encryptKeyWith");
 
             if (string.IsNullOrWhiteSpace(encryptKeyWith) || encryptKeyWith.Length != 32)
             {
                 _logger.LogWarning("Empty or invalid encryptWith key provided. Falling back to default.");
-                encryptKeyWith = Settings.defaultEncryptWithKey;
+                encryptKeyWith = Settings.Default.DefaultEncryptWithKey;
             }
 
             if (!options.SkipXmlParsing)
             {
-                string appXmlPath = Path.Combine(options.InputPath, Settings.pathToAppXml);
+                string appXmlPath = Path.Combine(options.InputPath, Settings.Default.PathToAppXml);
                 try
                 {
                     var parser = new XMLParser();
@@ -65,8 +66,7 @@ namespace CNUSPACKER
                 }
                 catch (Exception e)
                 {
-                    _logger.LogError(e, "Error parsing app.xml: {Path}", Settings.pathToAppXml);
-
+                    _logger.LogError(e, "Error parsing app.xml: {Path}", Settings.Default.PathToAppXml);
                 }
             }
             else
@@ -78,14 +78,14 @@ namespace CNUSPACKER
             short contentGroup = appInfo.GroupID;
             var rules = ContentRule.GetCommonRules(contentGroup, parentID);
 
-            Directory.CreateDirectory(Settings.tmpDir);
+            Directory.CreateDirectory(Settings.Default.TmpDir);
 
             var config = new NusPackageConfiguration(options.InputPath, appInfo, new Key(encryptionKey), new Key(encryptKeyWith), rules);
             var nuspackage = await NUSPackageFactory.CreateNewPackageAsync(config, _loggerFactory);
             await nuspackage.PackContentsAsync(options.OutputPath);
             nuspackage.PrintTicketInfos();
 
-            Utils.Utils.DeleteDir(Settings.tmpDir);
+            Utils.Utils.DeleteDir(Settings.Default.TmpDir);
         }
 
         private string ValidateOrFallbackKey(string key, string fallback, string name)
@@ -110,17 +110,17 @@ namespace CNUSPACKER
 
         private async Task<string> LoadEncryptWithKeyAsync()
         {
-            if (!File.Exists(Settings.encryptWithFile))
+            if (!File.Exists(Settings.Default.EncryptWithFile))
                 return "";
 
             try
             {
-                using var reader = new StreamReader(Settings.encryptWithFile);
+                using var reader = new StreamReader(Settings.Default.EncryptWithFile);
                 return await reader.ReadLineAsync() ?? "";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Failed to read encryption key file: {Settings.encryptWithFile}");
+                _logger.LogError(ex, $"Failed to read encryption key file: {Settings.Default.EncryptWithFile}");
                 return "";
             }
         }

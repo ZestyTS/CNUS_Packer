@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using CNUSPACKER.Configuration;
 
 namespace CNUSPACKER.Packaging
 {
@@ -34,24 +35,26 @@ namespace CNUSPACKER.Packaging
         /// </summary>
         public static List<ContentRule> GetCommonRules(short contentGroup, long titleID)
         {
+            var s = Settings.Default;
+
             var commonRules = new List<ContentRule>
             {
-                new ContentRule(@"^/code/app\.xml$", new ContentDetails(false, Settings.groupid_code, 0x0L, Settings.fstflags_code)),
-                new ContentRule(@"^/code/cos\.xml$", new ContentDetails(false, Settings.groupid_code, 0x0L, Settings.fstflags_code)),
-                new ContentRule(@"^/meta/meta\.xml$", new ContentDetails(true, Settings.groupid_meta, 0x0L, Settings.fstflags_meta)),
-                new ContentRule(@"^/meta/((?!\.xml).)*$", new ContentDetails(true, Settings.groupid_meta, 0x0L, Settings.fstflags_meta)),
-                new ContentRule(@"^/meta/bootMovie\.h264$", new ContentDetails(true, Settings.groupid_meta, 0x0L, Settings.fstflags_meta)),
-                new ContentRule(@"^/meta/bootLogoTex\.tga$", new ContentDetails(true, Settings.groupid_meta, 0x0L, Settings.fstflags_meta)),
-                new ContentRule(@"^/meta/Manual\.bfma$", new ContentDetails(true, Settings.groupid_meta, 0x0L, Settings.fstflags_meta)),
-                new ContentRule(@"^/meta/.*\.jpg$", new ContentDetails(true, Settings.groupid_meta, 0x0L, Settings.fstflags_meta)),
-                new ContentRule(@"/code/.*(\.rpx|\.rpl)$", new ContentDetails(true, Settings.groupid_code, 0x0L, Settings.fstflags_code), true),
-                new ContentRule(@"^/code/preload\.txt$", new ContentDetails(true, Settings.groupid_code, 0x0L, Settings.fstflags_code)),
-                new ContentRule(@"^/code/fw\.img$", new ContentDetails(false, Settings.groupid_code, 0x0L, Settings.fstflags_code)),
-                new ContentRule(@"^/code/fw\.tmd$", new ContentDetails(false, Settings.groupid_code, 0x0L, Settings.fstflags_code)),
-                new ContentRule(@"^/code/htk\.bin$", new ContentDetails(false, Settings.groupid_code, 0x0L, Settings.fstflags_code)),
-                new ContentRule(@"^/code/rvlt\.tik$", new ContentDetails(false, Settings.groupid_code, 0x0L, Settings.fstflags_code)),
-                new ContentRule(@"^/code/rvlt\.tmd$", new ContentDetails(false, Settings.groupid_code, 0x0L, Settings.fstflags_code)),
-                new ContentRule(@"^/content/.*$", new ContentDetails(true, contentGroup, titleID, Settings.fstflags_content))
+                new ContentRule(@"^/code/app\.xml$", new ContentDetails(false, s.GroupIdCode, 0x0L, s.FstFlagsCode)),
+                new ContentRule(@"^/code/cos\.xml$", new ContentDetails(false, s.GroupIdCode, 0x0L, s.FstFlagsCode)),
+                new ContentRule(@"^/meta/meta\.xml$", new ContentDetails(true, s.GroupIdMeta, 0x0L, s.FstFlagsMeta)),
+                new ContentRule(@"^/meta/((?!\.xml).)*$", new ContentDetails(true, s.GroupIdMeta, 0x0L, s.FstFlagsMeta)),
+                new ContentRule(@"^/meta/bootMovie\.h264$", new ContentDetails(true, s.GroupIdMeta, 0x0L, s.FstFlagsMeta)),
+                new ContentRule(@"^/meta/bootLogoTex\.tga$", new ContentDetails(true, s.GroupIdMeta, 0x0L, s.FstFlagsMeta)),
+                new ContentRule(@"^/meta/Manual\.bfma$", new ContentDetails(true, s.GroupIdMeta, 0x0L, s.FstFlagsMeta)),
+                new ContentRule(@"^/meta/.*\.jpg$", new ContentDetails(true, s.GroupIdMeta, 0x0L, s.FstFlagsMeta)),
+                new ContentRule(@"/code/.*(\.rpx|\.rpl)$", new ContentDetails(true, s.GroupIdCode, 0x0L, s.FstFlagsCode), true),
+                new ContentRule(@"^/code/preload\.txt$", new ContentDetails(true, s.GroupIdCode, 0x0L, s.FstFlagsCode)),
+                new ContentRule(@"^/code/fw\.img$", new ContentDetails(false, s.GroupIdCode, 0x0L, s.FstFlagsCode)),
+                new ContentRule(@"^/code/fw\.tmd$", new ContentDetails(false, s.GroupIdCode, 0x0L, s.FstFlagsCode)),
+                new ContentRule(@"^/code/htk\.bin$", new ContentDetails(false, s.GroupIdCode, 0x0L, s.FstFlagsCode)),
+                new ContentRule(@"^/code/rvlt\.tik$", new ContentDetails(false, s.GroupIdCode, 0x0L, s.FstFlagsCode)),
+                new ContentRule(@"^/code/rvlt\.tmd$", new ContentDetails(false, s.GroupIdCode, 0x0L, s.FstFlagsCode)),
+                new ContentRule(@"^/content/.*$", new ContentDetails(true, contentGroup, titleID, s.FstFlagsContent))
             };
 
             return commonRules;

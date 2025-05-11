@@ -1,48 +1,61 @@
 using System;
 using System.IO;
 
-namespace CNUSPACKER.utils
+namespace CNUSPACKER.Utils
 {
+    /// <summary>
+    /// A memory stream that provides convenience methods for writing big-endian primitive values.
+    /// </summary>
     public class BigEndianMemoryStream : MemoryStream
     {
-        public BigEndianMemoryStream(int capacity) : base(capacity)
-        {
-        }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="BigEndianMemoryStream"/> class with a specified capacity.
+        /// </summary>
+        /// <param name="capacity">The initial size of the internal buffer.</param>
+        public BigEndianMemoryStream(int capacity) : base(capacity) { }
 
+        /// <summary>
+        /// Writes a 16-bit signed integer in big-endian format.
+        /// </summary>
         public void WriteBigEndian(short value)
         {
-            byte[] shortBytes = BitConverter.GetBytes(value);
-            if (BitConverter.IsLittleEndian)
-                Array.Reverse(shortBytes);
-
-            base.Write(shortBytes, 0, shortBytes.Length);
+            WriteBigEndianInternal(BitConverter.GetBytes(value));
         }
 
+        /// <summary>
+        /// Writes a 32-bit signed integer in big-endian format.
+        /// </summary>
         public void WriteBigEndian(int value)
         {
-            byte[] intBytes = BitConverter.GetBytes(value);
-            if (BitConverter.IsLittleEndian)
-                Array.Reverse(intBytes);
-
-            base.Write(intBytes, 0, intBytes.Length);
+            WriteBigEndianInternal(BitConverter.GetBytes(value));
         }
 
+        /// <summary>
+        /// Writes a 32-bit unsigned integer in big-endian format.
+        /// </summary>
         public void WriteBigEndian(uint value)
         {
-            byte[] uintBytes = BitConverter.GetBytes(value);
-            if (BitConverter.IsLittleEndian)
-                Array.Reverse(uintBytes);
-
-            base.Write(uintBytes, 0, uintBytes.Length);
+            WriteBigEndianInternal(BitConverter.GetBytes(value));
         }
 
+        /// <summary>
+        /// Writes a 64-bit signed integer in big-endian format.
+        /// </summary>
         public void WriteBigEndian(long value)
         {
-            byte[] longBytes = BitConverter.GetBytes(value);
-            if (BitConverter.IsLittleEndian)
-                Array.Reverse(longBytes);
+            WriteBigEndianInternal(BitConverter.GetBytes(value));
+        }
 
-            base.Write(longBytes, 0, longBytes.Length);
+        /// <summary>
+        /// Internal helper for reversing and writing byte arrays.
+        /// </summary>
+        private void WriteBigEndianInternal(byte[] bytes)
+        {
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(bytes);
+            }
+            Write(bytes, 0, bytes.Length);
         }
     }
 }

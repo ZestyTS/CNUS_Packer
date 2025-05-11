@@ -2,8 +2,11 @@ using System;
 using System.IO;
 using System.Text.RegularExpressions;
 
-namespace CNUSPACKER.utils
+namespace CNUSPACKER.Utils
 {
+    /// <summary>
+    /// General utility methods for alignment, file operations, and conversions.
+    /// </summary>
     public static class Utils
     {
         /// <summary>
@@ -14,11 +17,15 @@ namespace CNUSPACKER.utils
             if (!Directory.Exists(dir))
                 return;
 
-            foreach (string filepath in Directory.EnumerateFiles(dir))
-                File.Delete(filepath);
+            foreach (var file in Directory.EnumerateFiles(dir))
+            {
+                File.Delete(file);
+            }
 
-            foreach (string subDir in Directory.EnumerateDirectories(dir))
+            foreach (var subDir in Directory.EnumerateDirectories(dir))
+            {
                 DeleteDir(subDir);
+            }
 
             Directory.Delete(dir);
         }
@@ -39,31 +46,30 @@ namespace CNUSPACKER.utils
         }
 
         /// <summary>
-        /// Converts a hex string (e.g. "A1B2C3") to a byte array.
+        /// Converts a hexadecimal string to a byte array.
         /// </summary>
-        public static byte[] HexStringToByteArray(string s)
+        public static byte[] HexStringToByteArray(string hex)
         {
-            if (string.IsNullOrEmpty(s))
-                throw new ArgumentException("Input hex string cannot be null or empty.", nameof(s));
+            if (string.IsNullOrEmpty(hex))
+                throw new ArgumentException("Hex string cannot be null or empty.", nameof(hex));
 
-            if (s.Length % 2 != 0)
-                throw new ArgumentException("Hex string must have an even length.", nameof(s));
+            if (hex.Length % 2 != 0)
+                throw new ArgumentException("Hex string length must be even.", nameof(hex));
 
-            if (!Regex.IsMatch(s, @"\A\b[0-9a-fA-F]*\b\Z"))
-                throw new ArgumentException("Hex string contains invalid characters.", nameof(s));
+            if (!Regex.IsMatch(hex, "^[0-9a-fA-F]*$"))
+                throw new ArgumentException("Hex string contains invalid characters.", nameof(hex));
 
-            int outputLength = s.Length / 2;
-            byte[] output = new byte[outputLength];
-            for (int i = 0; i < outputLength; i++)
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int i = 0; i < bytes.Length; i++)
             {
-                output[i] = Convert.ToByte(s.Substring(i * 2, 2), 16);
+                bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
             }
 
-            return output;
+            return bytes;
         }
 
         /// <summary>
-        /// Converts a byte array into a hexadecimal string representation (e.g. "A1B2C3").
+        /// Converts a byte array into a hexadecimal string representation.
         /// </summary>
         public static string ByteArrayToHexString(byte[] bytes)
         {
@@ -83,7 +89,7 @@ namespace CNUSPACKER.utils
         }
 
         /// <summary>
-        /// Creates a copy of a sub-range from a byte array.
+        /// Copies a range of bytes from the source array.
         /// </summary>
         public static byte[] CopyOfRange(byte[] src, int start, int end)
         {
@@ -96,7 +102,6 @@ namespace CNUSPACKER.utils
             int len = end - start;
             byte[] dest = new byte[len];
             Array.Copy(src, start, dest, 0, len);
-
             return dest;
         }
     }

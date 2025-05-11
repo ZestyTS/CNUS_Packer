@@ -1,4 +1,6 @@
-namespace CNUSPACKER.utils
+using CNUSPACKER.utils;
+
+namespace CNUSPACKER.Models
 {
     public class AppXMLInfo
     {

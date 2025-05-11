@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using CNUSPACKER.crypto;
-using CNUSPACKER.utils;
+using CNUSPACKER.Models;
 
 namespace CNUSPACKER.packaging
 {

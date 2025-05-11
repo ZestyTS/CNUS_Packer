@@ -1,6 +1,7 @@
 using System.IO;
 using CNUSPACKER.contents;
 using CNUSPACKER.crypto;
+using CNUSPACKER.Models;
 using CNUSPACKER.utils;
 
 namespace CNUSPACKER.packaging

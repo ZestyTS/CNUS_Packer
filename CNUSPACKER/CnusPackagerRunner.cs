@@ -2,26 +2,33 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using CNUSPACKER.crypto;
+using CNUSPACKER.Models;
 using CNUSPACKER.packaging;
 using CNUSPACKER.utils;
+using Microsoft.Extensions.Logging;
 
 namespace CNUSPACKER
 {
-    public class CnusPackagerOptions
-    {
-        public string InputPath { get; set; } = "input";
-        public string OutputPath { get; set; } = "output";
-        public string EncryptionKey { get; set; } = "";
-        public string EncryptKeyWith { get; set; } = "";
-        public long TitleID { get; set; } = 0;
-        public long OSVersion { get; set; } = 0x000500101000400AL;
-        public uint AppType { get; set; } = 0x80000000;
-        public short TitleVersion { get; set; } = 0;
-        public bool SkipXmlParsing { get; set; } = false;
-    }
-
+    /// <summary>
+    /// Responsible for creating a WUP package based on user-defined options.
+    /// </summary>
     public class CnusPackagerRunner
     {
+        private readonly ILogger<CnusPackagerRunner> _logger;
+
+        /// <summary>
+        /// Creates a new instance of the packager runner.
+        /// </summary>
+        /// <param name="logger">Logger used for diagnostic and status output.</param>
+        public CnusPackagerRunner(ILogger<CnusPackagerRunner> logger)
+        {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
+
+        /// <summary>
+        /// Executes the packager using the given options.
+        /// </summary>
+        /// <param name="options">Settings and input values to use.</param>
         public void Run(CnusPackagerOptions options)
         {
             ValidateInputFolders(options.InputPath);
@@ -35,16 +42,14 @@ namespace CNUSPACKER
                 titleVersion = options.TitleVersion
             };
 
-            string encryptionKey = string.IsNullOrWhiteSpace(options.EncryptionKey) || options.EncryptionKey.Length != 32
-                ? Settings.defaultEncryptionKey
-                : options.EncryptionKey;
-
-            string encryptKeyWith = string.IsNullOrWhiteSpace(options.EncryptKeyWith) || options.EncryptKeyWith.Length != 32
-                ? LoadEncryptWithKey()
-                : options.EncryptKeyWith;
+            string encryptionKey = ValidateOrFallbackKey(options.EncryptionKey, Settings.defaultEncryptionKey, "encryptionKey");
+            string encryptKeyWith = ValidateOrFallbackKey(options.EncryptKeyWith, LoadEncryptWithKey(), "encryptKeyWith");
 
             if (string.IsNullOrWhiteSpace(encryptKeyWith) || encryptKeyWith.Length != 32)
+            {
+                _logger.LogWarning("Empty or invalid encryptWith key provided. Falling back to default.");
                 encryptKeyWith = Settings.defaultEncryptWithKey;
+            }
 
             if (!options.SkipXmlParsing)
             {
@@ -57,13 +62,17 @@ namespace CNUSPACKER
                 }
                 catch (Exception e)
                 {
-                    throw new Exception($"Error parsing app.xml: {e.Message}", e);
+                    _logger.LogError(e, $"Error parsing app.xml: {Settings.pathToAppXml}");
                 }
+            }
+            else
+            {
+                _logger.LogInformation("XML parsing was skipped by request.");
             }
 
             long parentID = appInfo.titleID & ~0x0000000F00000000L;
             short contentGroup = appInfo.groupID;
-            List<ContentRule> rules = ContentRule.GetCommonRules(contentGroup, parentID);
+            var rules = ContentRule.GetCommonRules(contentGroup, parentID);
 
             Directory.CreateDirectory(Settings.tmpDir);
 
@@ -75,17 +84,27 @@ namespace CNUSPACKER
             Utils.DeleteDir(Settings.tmpDir);
         }
 
+        private string ValidateOrFallbackKey(string key, string fallback, string name)
+        {
+            if (string.IsNullOrWhiteSpace(key) || key.Length != 32)
+            {
+                _logger.LogWarning($"{name} is empty or invalid. Using fallback value.");
+                return fallback;
+            }
+            return key;
+        }
+
         private static void ValidateInputFolders(string inputPath)
         {
             if (!Directory.Exists(Path.Combine(inputPath, "code")) ||
                 !Directory.Exists(Path.Combine(inputPath, "content")) ||
                 !Directory.Exists(Path.Combine(inputPath, "meta")))
             {
-                throw new DirectoryNotFoundException($"Invalid input directory: \"{Path.GetFullPath(inputPath)}\". Missing 'code', 'content', or 'meta'.");
+                throw new DirectoryNotFoundException($"Input directory '{Path.GetFullPath(inputPath)}' is missing required subfolders: code, content, meta.");
             }
         }
 
-        private static string LoadEncryptWithKey()
+        private string LoadEncryptWithKey()
         {
             if (!File.Exists(Settings.encryptWithFile))
                 return "";
@@ -95,8 +114,9 @@ namespace CNUSPACKER
                 using var reader = new StreamReader(Settings.encryptWithFile);
                 return reader.ReadLine() ?? "";
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, $"Failed to read encryption key file: {Settings.encryptWithFile}");
                 return "";
             }
         }

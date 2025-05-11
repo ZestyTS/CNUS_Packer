@@ -1,78 +1,68 @@
-using System;
 using System.IO;
-using CNUSPACKER.contents;
-using CNUSPACKER.crypto;
-using CNUSPACKER.utils;
+using CNUSPACKER.Crypto;
+using CNUSPACKER.Utils;
+using Microsoft.Extensions.Logging;
 
-namespace CNUSPACKER.packaging
+namespace CNUSPACKER.Packaging
 {
+    /// <summary>
+    /// Represents the core package builder for WUP content.
+    /// </summary>
     public class NUSpackage
     {
-        private readonly FST fst;
-        private readonly Ticket ticket;
-        private readonly TMD tmd;
+        private readonly FST _fst;
+        private readonly Ticket _ticket;
+        private readonly TMD _tmd;
+        private readonly ILogger<NUSpackage>? _logger;
 
-        public NUSpackage(FST fst, Ticket ticket, TMD tmd)
+        public NUSpackage(FST fst, Ticket ticket, TMD tmd, ILogger<NUSpackage>? logger = null)
         {
-            this.fst = fst;
-            this.ticket = ticket;
-            this.tmd = tmd;
+            _fst = fst;
+            _ticket = ticket;
+            _tmd = tmd;
+            _logger = logger;
         }
 
+        /// <summary>
+        /// Packs all content files, encrypts them, and writes metadata files.
+        /// </summary>
         public void PackContents(string outputDir)
         {
-            Console.WriteLine("Packing Contents.");
+            _logger?.LogInformation("Packing contents to directory: {OutputDir}", outputDir);
 
-            Encryption encryption = GetEncryption();
-            fst.contents.PackContents(outputDir, encryption);
+            Encryption encryption = _tmd.GetEncryption();
+            _fst.Contents.PackContents(outputDir, encryption);
 
-            Console.WriteLine("Packing the FST into 00000000.app");
+            _logger?.LogInformation("Packing FST as 00000000.app");
             string fstPath = Path.Combine(outputDir, "00000000.app");
-            encryption.EncryptFileWithPadding(fst, fstPath, 0, Content.CONTENT_FILE_PADDING);
-            Console.WriteLine("-------------");
-            Console.WriteLine("Packed all contents\n\n");
+            encryption.EncryptFileWithPadding(_fst, fstPath, 0, Content.ContentFilePadding);
 
-            Content fstContent = fst.contents.fstContent;
-            fstContent.SHA1 = HashUtil.HashSHA1(fst.GetAsData());
-            fstContent.encryptedFileSize = fst.GetDataSize();
+            Content fstContent = _fst.Contents.FstContent;
+            fstContent.Sha1 = HashUtil.HashSHA1(_fst.GetAsData());
+            fstContent.EncryptedFileSize = _fst.GetDataSize();
 
-            tmd.contentInfo.SHA2Hash = HashUtil.HashSHA2(fst.contents.GetAsData());
-            tmd.UpdateContentInfoHash();
+            _tmd.contentInfo.Sha2Hash = HashUtil.HashSHA2(_fst.Contents.GetAsData());
+            _tmd.UpdateContentInfoHash();
 
-            FileStream fos;
-            using (fos = new FileStream(Path.Combine(outputDir, "title.tmd"), FileMode.Create))
-            {
-                fos.Write(tmd.GetAsData(), 0, tmd.GetAsData().Length);
-
-            }
-            Console.WriteLine($"TMD saved to    {Path.Combine(outputDir, "title.tmd")}");
-
-            using (fos = new FileStream(Path.Combine(outputDir, "title.cert"), FileMode.Create))
-            {
-                var cert = Cert.GetCertAsData();
-                fos.Write(cert, 0, cert.Length);
-            }
-            Console.WriteLine($"Cert saved to   {Path.Combine(outputDir, "title.cert")}");
-
-            using (fos = new FileStream(Path.Combine(outputDir, "title.tik"), FileMode.Create))
-            {
-                fos.Write(ticket.GetAsData(), 0, ticket.GetAsData().Length);
-            }
-            Console.WriteLine($"Ticket saved to {Path.Combine(outputDir, "title.tik")}");
-            Console.WriteLine();
+            WriteFile(Path.Combine(outputDir, "title.tmd"), _tmd.GetAsData(), "TMD");
+            WriteFile(Path.Combine(outputDir, "title.cert"), Cert.GetCertAsData(), "Cert");
+            WriteFile(Path.Combine(outputDir, "title.tik"), _ticket.GetAsData(), "Ticket");
         }
 
+        /// <summary>
+        /// Logs summary of ticket encryption keys.
+        /// </summary>
         public void PrintTicketInfos()
         {
-            Console.WriteLine($"Encrypted with this key           : {ticket.decryptedKey}");
-            Console.WriteLine($"Key encrypted with this key       : {ticket.encryptWith}");
-            Console.WriteLine();
-            Console.WriteLine($"Encrypted key                     : {ticket.GetEncryptedKey()}");
+            _logger?.LogInformation("Encrypted with key         : {Key}", _ticket.DecryptedKey);
+            _logger?.LogInformation("Key encrypted with         : {With}", _ticket.EncryptWith);
+            _logger?.LogInformation("Encrypted key              : {EncryptedKey}", _ticket.GetEncryptedKey());
         }
 
-        private Encryption GetEncryption()
+        private void WriteFile(string path, byte[] data, string label)
         {
-            return tmd.GetEncryption();
+            File.WriteAllBytes(path, data);
+            _logger?.LogInformation("{Label} saved to {Path}", label, path);
         }
     }
 }

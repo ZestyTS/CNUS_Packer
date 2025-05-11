@@ -1,50 +1,37 @@
 using System.IO;
-using CNUSPACKER.utils;
+using CNUSPACKER.Utils;
 
-namespace CNUSPACKER.packaging
+namespace CNUSPACKER.Packaging
 {
+    /// <summary>
+    /// Provides a static method to generate a certificate block used in packaging.
+    /// </summary>
     public static class Cert
     {
         public static byte[] GetCertAsData()
         {
-            MemoryStream buffer = new MemoryStream(0xA00);
+            var certData = new (int Offset, string Hex)[]
+            {
+                (0x000, "00010003"),
+                (0x400, "00010004"),
+                (0x700, "00010004"),
+                (0x240, "526F6F74000000000000000000000000"),
+                (0x280, "00000001434130303030303030330000"),
+                (0x540, "526F6F742D4341303030303030303300"),
+                (0x580, "00000001435030303030303030620000"),
+                (0x840, "526F6F742D4341303030303030303300"),
+                (0x880, "00000001585330303030303030630000")
+            };
 
-            byte[] hexData = Utils.HexStringToByteArray("00010003");
-            buffer.Write(hexData, 0, hexData.Length);
+            using var buffer = new MemoryStream(0xA00);
+            foreach (var entry in certData)
+            {
+                buffer.Seek(entry.Offset, SeekOrigin.Begin);
+                byte[] data = Utils.HexStringToByteArray(entry.Hex);
+                buffer.Write(data, 0, data.Length);
+            }
 
-            buffer.Seek(0x400, SeekOrigin.Begin);
-            hexData = Utils.HexStringToByteArray("00010004");
-            buffer.Write(hexData, 0, hexData.Length);
-
-            buffer.Seek(0x700, SeekOrigin.Begin);
-            hexData = Utils.HexStringToByteArray("00010004");
-            buffer.Write(hexData, 0, hexData.Length);
-
-            buffer.Seek(0x240, SeekOrigin.Begin);
-            hexData = Utils.HexStringToByteArray("526F6F74000000000000000000000000");
-            buffer.Write(hexData, 0, hexData.Length);
-
-            buffer.Seek(0x280, SeekOrigin.Begin);
-            hexData = Utils.HexStringToByteArray("00000001434130303030303030330000");
-            buffer.Write(hexData, 0, hexData.Length);
-
-            buffer.Seek(0x540, SeekOrigin.Begin);
-            hexData = Utils.HexStringToByteArray("526F6F742D4341303030303030303300");
-            buffer.Write(hexData, 0, hexData.Length);
-
-            buffer.Seek(0x580, SeekOrigin.Begin);
-            hexData = Utils.HexStringToByteArray("00000001435030303030303030620000");
-            buffer.Write(hexData, 0, hexData.Length);
-
-            buffer.Seek(0x840, SeekOrigin.Begin);
-            hexData = Utils.HexStringToByteArray("526F6F742D4341303030303030303300");
-            buffer.Write(hexData, 0, hexData.Length);
-
-            buffer.Seek(0x880, SeekOrigin.Begin);
-            hexData = Utils.HexStringToByteArray("00000001585330303030303030630000");
-            buffer.Write(hexData, 0, hexData.Length);
-
-            return buffer.GetBuffer();
+            return buffer.ToArray();
         }
     }
 }

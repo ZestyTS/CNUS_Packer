@@ -1,83 +1,83 @@
 using System.IO;
 using System.Text;
-using CNUSPACKER.contents;
-using CNUSPACKER.fst;
-using CNUSPACKER.utils;
+using CNUSPACKER.FST;
+using CNUSPACKER.Utils;
 
-namespace CNUSPACKER.packaging
+namespace CNUSPACKER.Packaging
 {
+    /// <summary>
+    /// Represents the File System Table (FST) structure used in WUP packaging.
+    /// </summary>
     public class FST
     {
-        private static readonly byte[] magicbytes = { 0x46, 0x53, 0x54, 0x00 };
-        private const int unknown = 0x20;
-        private int contentCount;
+        private static readonly byte[] MagicBytes = { 0x46, 0x53, 0x54, 0x00 }; // "FST\0"
+        private const int HeaderPadding = 0x20;
 
-        public readonly Contents contents;
-        public readonly FSTEntries fileEntries = new FSTEntries();
+        private readonly Contents _contents;
+        private readonly FSTEntries _fileEntries = new FSTEntries();
 
-        private static readonly MemoryStream strings = new MemoryStream();
+        private static readonly MemoryStream Strings = new MemoryStream();
+        public static int CurEntryOffset { get; set; }
 
-        public static int curEntryOffset { get; set; }
+        public Contents Contents => _contents;
+        public FSTEntries FileEntries => _fileEntries;
 
         public FST(Contents contents)
         {
-            this.contents = contents;
+            _contents = contents;
         }
 
+        /// <summary>
+        /// Updates file entry offsets, hashes, and structure before writing.
+        /// </summary>
         public void Update()
         {
-            contents.ResetFileOffsets();
-            fileEntries.Update();
-            contents.Update(fileEntries);
-            fileEntries.GetRootEntry().SetEntryCount(fileEntries.GetFSTEntryCount());
-
-            contentCount = contents.GetContentCount();
+            _contents.ResetFileOffsets();
+            _fileEntries.Update();
+            _contents.Update(_fileEntries);
+            _fileEntries.GetRootEntry().SetEntryCount(_fileEntries.GetFSTEntryCount());
         }
 
-        public static int GetStringPosition()
-        {
-            return (int)strings.Position;
-        }
+        public static int GetStringPosition() => (int)Strings.Position;
 
         public static void AddString(string filename)
         {
-            strings.Write(Encoding.ASCII.GetBytes(filename), 0, filename.Length);
-            strings.WriteByte(0x00);
+            Strings.Write(Encoding.ASCII.GetBytes(filename), 0, filename.Length);
+            Strings.WriteByte(0x00);
         }
 
+        /// <summary>
+        /// Serializes the entire FST (header, file entries, and strings) to a byte array.
+        /// </summary>
         public byte[] GetAsData()
         {
-            BigEndianMemoryStream buffer = new BigEndianMemoryStream(GetDataSize());
+            var buffer = new BigEndianMemoryStream(GetDataSize());
 
-            buffer.Write(magicbytes, 0, magicbytes.Length);
-            buffer.WriteBigEndian(unknown);
-            buffer.WriteBigEndian(contentCount);
-            buffer.Seek(20, SeekOrigin.Current);
+            buffer.Write(MagicBytes, 0, MagicBytes.Length);
+            buffer.WriteBigEndian(HeaderPadding);
+            buffer.WriteBigEndian(_contents.GetContentCount());
+            buffer.Seek(20, SeekOrigin.Current); // Reserved
 
-            byte[] contentHeaderData = contents.GetFSTContentHeaderAsData();
-            buffer.Write(contentHeaderData, 0, contentHeaderData.Length);
-
-            byte[] fileEntriesData = fileEntries.GetAsData();
-            buffer.Write(fileEntriesData, 0, fileEntriesData.Length);
-
-            byte[] stringsData = strings.ToArray();
-            buffer.Write(stringsData, 0, stringsData.Length);
+            buffer.Write(_contents.GetFstContentHeaderAsData(), 0, _contents.GetFstContentHeaderAsData().Length);
+            buffer.Write(_fileEntries.GetAsData(), 0, _fileEntries.GetAsData().Length);
+            buffer.Write(Strings.ToArray(), 0, (int)Strings.Length);
 
             return buffer.GetBuffer();
         }
 
-
+        /// <summary>
+        /// Calculates the total size of the FST structure.
+        /// </summary>
         public int GetDataSize()
         {
             int size = 0;
-            size += magicbytes.Length;
-            size += 0x04; // unknown
-            size += 0x04; // contentCount
-            size += 20; // padding
-            size += contents.GetFSTContentHeaderDataSize();
-            size += fileEntries.GetDataSize();
-            size += (int)strings.Position;
-            return (int)Utils.Align(size, 0x8000);
+            size += MagicBytes.Length;         // Header
+            size += 4 + 4 + 20;                // Padding fields
+            size += _contents.GetFstContentHeaderDataSize();
+            size += _fileEntries.GetDataSize();
+            size += (int)Strings.Position;
+
+            return (int)Utils.Utils.Align(size, 0x8000);
         }
     }
 }

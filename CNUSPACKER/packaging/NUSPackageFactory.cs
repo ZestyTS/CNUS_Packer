@@ -1,51 +1,56 @@
-using System;
 using System.IO;
-using CNUSPACKER.contents;
-using CNUSPACKER.fst;
+using CNUSPACKER.FST;
+using Microsoft.Extensions.Logging;
 
-namespace CNUSPACKER.packaging
+namespace CNUSPACKER.Packaging
 {
+    /// <summary>
+    /// Responsible for building a fully populated NUSpackage from configuration.
+    /// </summary>
     public static class NUSPackageFactory
     {
-        public static NUSpackage CreateNewPackage(NusPackageConfiguration config)
+        /// <summary>
+        /// Constructs a new NUSpackage using the given configuration.
+        /// </summary>
+        public static NUSpackage CreateNewPackage(NusPackageConfiguration config, ILogger<NUSpackage>? logger = null)
         {
-            Contents contents = new Contents();
-            FST fst = new FST(contents);
+            var contents = new Contents();
+            var fst = new FST(contents);
 
-            FSTEntry root = fst.fileEntries.GetRootEntry();
-            root.SetContent(contents.fstContent);
+            FSTEntry root = fst.FileEntries.GetRootEntry();
+            root.SetContent(contents.FstContent);
 
-            PopulateFSTEntries(config.dir, root);
+            PopulateFSTEntries(config.Dir, root);
+            logger?.LogInformation("Finished reading input files. Applying content rules...");
 
-            Console.WriteLine("Finished reading in input files. Files read. Applying content rules.");
+            var ruleService = new ContentRulesService(logger?.CreateLogger<ContentRulesService>() ?? throw new InvalidDataException("Logger required"));
+            ruleService.ApplyRules(root, contents, config.Rules);
 
-            ContentRulesService.ApplyRules(root, contents, config.rules);
-
-            Console.WriteLine("Generating the FST.");
+            logger?.LogInformation("Generating the FST...");
             fst.Update();
 
-            Console.WriteLine("Generating the Ticket");
-            Ticket ticket = new Ticket(config.appInfo.titleID, config.encryptionKey, config.encryptKeyWith);
+            logger?.LogInformation("Generating the Ticket...");
+            var ticket = new Ticket(config.AppInfo.TitleID, config.EncryptionKey, config.EncryptKeyWith);
 
-            Console.WriteLine("Generating the TMD");
-            TMD tmd = new TMD(config.appInfo, fst, ticket);
+            logger?.LogInformation("Generating the TMD...");
+            var tmd = new TMD(config.AppInfo, fst, ticket);
 
-            return new NUSpackage(fst, ticket, tmd);
+            return new NUSpackage(fst, ticket, tmd, logger);
         }
 
         private static void PopulateFSTEntries(string directory, FSTEntry parent)
         {
-            foreach (string file in Directory.EnumerateFiles(directory)) // files first
+            foreach (var file in Directory.EnumerateFiles(directory))
             {
-                FSTEntry newFile = new FSTEntry(file);
-                parent.AddChildren(newFile);
+                var entry = new FSTEntry(file);
+                parent.AddChild(entry);
             }
 
-            foreach (string dir in Directory.EnumerateDirectories(directory)) // directories afterwards
+            foreach (var dir in Directory.EnumerateDirectories(directory))
             {
-                FSTEntry newDir = new FSTEntry(dir);
-                parent.AddChildren(newDir);
-                PopulateFSTEntries(dir, newDir);
+                var entry = new FSTEntry(dir);
+                parent.AddChild(entry);
+                PopulateFSTEntries(dir, entry);
             }
         }
     }

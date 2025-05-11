@@ -1,130 +1,137 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using CNUSPACKER.contents;
-using CNUSPACKER.fst;
+using CNUSPACKER.FST;
+using Microsoft.Extensions.Logging;
 
-namespace CNUSPACKER.packaging
+namespace CNUSPACKER.Packaging
 {
-    public static class ContentRulesService
+    /// <summary>
+    /// Applies content rules to file entries in the file system tree.
+    /// </summary>
+    public class ContentRulesService
     {
-        private const long MAX_CONTENT_LENGTH = (long) (0xBFFFFFFFL * 0.975);
+        private const long MaxContentLength = (long)(0xBFFFFFFFL * 0.975);
 
-        private static long cur_content_size;
+        private long _curContentSize;
+        private Content _curContent;
+        private Content _curContentFirst;
 
-        private static Content cur_content;
-        private static Content cur_content_first;
+        private readonly ILogger<ContentRulesService> _logger;
 
-        public static void ApplyRules(FSTEntry root, Contents targetContents, List<ContentRule> rules)
+        public ContentRulesService(ILogger<ContentRulesService> logger)
         {
-            Console.WriteLine("-----");
-            foreach (ContentRule rule in rules)
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// Applies a list of content rules to the file system tree.
+        /// </summary>
+        public void ApplyRules(FSTEntry root, Contents targetContents, List<ContentRule> rules)
+        {
+            _logger.LogInformation("Applying content rules...");
+
+            foreach (var rule in rules)
             {
-                Regex regex = new Regex(rule.pattern, RegexOptions.IgnoreCase);
-                Console.WriteLine($"Apply rule \"{rule.pattern}\"");
-                if (rule.contentPerMatch)
+                var regex = new Regex(rule.Pattern, RegexOptions.IgnoreCase);
+                _logger.LogInformation("Applying rule: {Pattern}", rule.Pattern);
+
+                if (rule.ContentPerMatch)
                 {
-                    SetNewContentRecursiveRule("", root, targetContents, rule.details, regex);
+                    SetNewContentRecursive("", root, targetContents, rule.Details, regex);
                 }
                 else
                 {
-                    cur_content = targetContents.GetNewContent(rule.details);
-                    cur_content_first = cur_content;
-                    cur_content_size = 0L;
-                    bool result = SetContentRecursiveRule("", root, targetContents, rule.details, regex);
-                    if (!result)
+                    _curContent = targetContents.GetNewContent(rule.Details);
+                    _curContentFirst = _curContent;
+                    _curContentSize = 0L;
+
+                    bool matched = SetContentRecursive("", root, targetContents, rule.Details, regex);
+
+                    if (!matched)
                     {
-                        Console.WriteLine("No file matched the rule. Lets delete the content again");
-                        targetContents.DeleteContent(cur_content);
+                        _logger.LogWarning("No file matched rule: {Pattern}, removing content.", rule.Pattern);
+                        targetContents.DeleteContent(_curContent);
                     }
                 }
-                Console.WriteLine("-----");
             }
         }
 
-        private static Content SetNewContentRecursiveRule(string path, FSTEntry currentEntry, Contents targetContents, ContentDetails details, Regex regex)
+        private Content SetNewContentRecursive(string path, FSTEntry current, Contents contents, ContentDetails details, Regex regex)
         {
-            path += currentEntry.filename + "/";
+            path += current.Filename + "/";
             Content result = null;
 
-            if (currentEntry.children.Count == 0)
+            if (current.Children.Count == 0 && regex.IsMatch(path))
             {
-                if (regex.IsMatch(path))
-                {
-                    result = targetContents.GetNewContent(details);
-                }
+                result = contents.GetNewContent(details);
             }
 
-            foreach (FSTEntry child in currentEntry.children)
+            foreach (var child in current.Children)
             {
-                if (child.isDir)
+                if (child.IsDir)
                 {
-                    result = SetNewContentRecursiveRule(path, child, targetContents, details, regex) ?? result;
+                    result = SetNewContentRecursive(path, child, contents, details, regex) ?? result;
                 }
                 else
                 {
-                    string childPath = path + child.filename;
-                    if (regex.IsMatch(childPath))
+                    var fullPath = path + child.Filename;
+                    if (regex.IsMatch(fullPath))
                     {
-                        Content result_content = targetContents.GetNewContent(details);
-                        Console.WriteLine($"Set content to {result_content.ID:X} for: {childPath}");
-                        child.SetContent(result_content);
-                        result = result_content;
+                        var assigned = contents.GetNewContent(details);
+                        _logger.LogDebug("Assigned content {ContentId:X} to: {Path}", assigned.ID, fullPath);
+                        child.SetContent(assigned);
+                        result = assigned;
                     }
                 }
             }
 
             if (result != null)
-                currentEntry.SetContent(result);
+                current.SetContent(result);
 
             return result;
         }
 
-        private static bool SetContentRecursiveRule(string path, FSTEntry currentEntry, Contents targetContents, ContentDetails details, Regex regex)
+        private bool SetContentRecursive(string path, FSTEntry current, Contents contents, ContentDetails details, Regex regex)
         {
-            path += currentEntry.filename + "/";
+            path += current.Filename + "/";
             bool matchFound = false;
-            if (currentEntry.children.Count == 0)
+
+            if (current.Children.Count == 0 && regex.IsMatch(path))
             {
-                if (regex.IsMatch(path))
-                {
-                    Console.WriteLine($"Set content to {cur_content.ID:X} ({cur_content_size:X},{currentEntry.fileSize:X}) for: {path}");
-                    currentEntry.SetContent(cur_content);
-
-                    return true;
-                }
-
-                return false;
+                _logger.LogDebug("Assigned content {ContentId:X} ({Offset:X},{Size:X}) to: {Path}", _curContent.ID, _curContentSize, current.FileSize, path);
+                current.SetContent(_curContent);
+                return true;
             }
 
-            foreach (FSTEntry child in currentEntry.children)
+            foreach (var child in current.Children)
             {
-                if (child.isDir)
+                if (child.IsDir)
                 {
-                    matchFound |= SetContentRecursiveRule(path, child, targetContents, details, regex);
+                    matchFound |= SetContentRecursive(path, child, contents, details, regex);
                 }
                 else
                 {
-                    string childPath = path + child.filename;
-                    if (regex.IsMatch(childPath))
+                    var fullPath = path + child.Filename;
+                    if (regex.IsMatch(fullPath))
                     {
-                        if (cur_content_size + child.fileSize > MAX_CONTENT_LENGTH)
+                        if (_curContentSize + child.FileSize > MaxContentLength)
                         {
-                            Console.WriteLine($"Info: Target content size is bigger than {MAX_CONTENT_LENGTH} bytes. Content will be split into multiple files.");
-                            cur_content = targetContents.GetNewContent(details);
-                            cur_content_size = 0;
+                            _logger.LogInformation("Splitting content due to size limit. Creating new content block.");
+                            _curContent = contents.GetNewContent(details);
+                            _curContentSize = 0;
                         }
-                        cur_content_size += child.fileSize;
 
-                        Console.WriteLine($"Set content to {cur_content.ID:X} ({cur_content_size:X},{child.fileSize:X}) for: {childPath}");
-                        child.SetContent(cur_content);
+                        _curContentSize += child.FileSize;
+                        _logger.LogDebug("Assigned content {ContentId:X} ({Offset:X},{Size:X}) to: {Path}", _curContent.ID, _curContentSize, child.FileSize, fullPath);
+                        child.SetContent(_curContent);
                         matchFound = true;
                     }
                 }
             }
 
             if (matchFound)
-                currentEntry.SetContent(cur_content_first);
+                current.SetContent(_curContentFirst);
 
             return matchFound;
         }

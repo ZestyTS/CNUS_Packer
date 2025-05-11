@@ -7,24 +7,28 @@ namespace CNUSPACKER.utils
     {
         public static byte[] HashSHA2(byte[] data)
         {
-            SHA256 sha256 = SHA256.Create();
+            using SHA256 sha256 = SHA256.Create();
             return sha256.ComputeHash(data);
         }
 
         public static byte[] HashSHA1(byte[] data)
         {
-            SHA1 sha1 = SHA1.Create();
+            using SHA1 sha1 = SHA1.Create();
             return sha1.ComputeHash(data);
         }
 
         public static byte[] HashSHA1(string file, int alignment)
         {
-            SHA1 sha1 = SHA1.Create();
+            using SHA1 sha1 = SHA1.Create();
             using FileStream input = new FileStream(file, FileMode.Open);
 
             long targetSize = Utils.Align(input.Length, alignment);
             byte[] alignedFileContents = new byte[targetSize];
-            input.Read(alignedFileContents);
+
+            int bytesRead = input.Read(alignedFileContents, 0, alignedFileContents.Length);
+
+            while (bytesRead < targetSize)
+                bytesRead += input.Read(alignedFileContents, bytesRead, alignedFileContents.Length - bytesRead);
 
             return sha1.ComputeHash(alignedFileContents);
         }

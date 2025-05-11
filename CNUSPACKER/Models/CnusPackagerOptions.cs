@@ -12,10 +12,10 @@
         public string OutputPath { get; set; } = "output";
 
         /// <summary>The 32-character key used to encrypt the package.</summary>
-        public string EncryptionKey { get; set; } = "";
+        public string EncryptionKey { get; set; } = string.Empty;
 
         /// <summary>The 32-character key used to encrypt the encryption key.</summary>
-        public string EncryptKeyWith { get; set; } = "";
+        public string EncryptKeyWith { get; set; } = string.Empty;
 
         /// <summary>The full 16-character Title ID for the WUP package.</summary>
         public long TitleID { get; set; } = 0;

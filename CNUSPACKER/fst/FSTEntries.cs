@@ -12,18 +12,20 @@ namespace CNUSPACKER.FST
     {
         private readonly List<FSTEntry> _entries;
         private readonly ILogger<FSTEntries>? _logger;
-        private readonly FST _fst;
+        private readonly Packaging.FST _fst;
 
         /// <summary>
         /// Initializes a new <see cref="FSTEntries"/> tree with a root node.
         /// </summary>
-        public FSTEntries(FST fst, ILogger<FSTEntries>? logger = null)
+        public FSTEntries(Packaging.FST fst, ILogger<FSTEntries>? logger = null)
         {
             _fst = fst;
             _logger = logger;
             _entries = new List<FSTEntry> { new FSTEntry(fst) };
             _logger?.LogDebug("Initialized FSTEntries with root entry.");
         }
+
+
 
         /// <summary>
         /// Updates all entries and recalculates offsets.

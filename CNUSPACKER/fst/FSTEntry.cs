@@ -1,12 +1,10 @@
-// Refactored FSTEntry.cs with optimizations, logging, and C# 8 compatibility
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using CNUSPACKER.Packaging;
-using CNUSPACKER.utils;
-using Microsoft.Extensions.Logging;
+using CNUSPACKER.Utils;
 
 namespace CNUSPACKER.FST
 {
@@ -26,6 +24,7 @@ namespace CNUSPACKER.FST
         private readonly bool _isRoot;
         private int _rootEntryCount;
         private Content _content;
+        private readonly Packaging.FST _fst;
 
         public string Filepath { get; }
         public string Filename { get; } = string.Empty;
@@ -38,14 +37,16 @@ namespace CNUSPACKER.FST
 
         public IReadOnlyList<FSTEntry> Children => _children;
 
-        public FSTEntry()
+        public FSTEntry(Packaging.FST fst)
         {
+            _fst = fst;
             _isRoot = true;
             IsDirectory = true;
         }
 
-        public FSTEntry(string filepath)
+        public FSTEntry(string filepath, Packaging.FST fst)
         {
+            _fst = fst;
             Filepath = Path.GetFullPath(filepath);
             IsDirectory = Directory.Exists(filepath);
             if (!IsDirectory)
@@ -122,10 +123,10 @@ namespace CNUSPACKER.FST
 
         public void Update()
         {
-            SetNameOffset(FST.GetStringPosition());
-            FST.AddString(Filename);
-            _entryOffset = FST.curEntryOffset;
-            FST.curEntryOffset++;
+            SetNameOffset(_fst.GetStringPosition());
+            _fst.AddString(Filename);
+            _entryOffset = _fst.CurEntryOffset;
+            _fst.CurEntryOffset++;
 
             if (IsDirectory && !_isRoot)
                 ParentOffset = _parent._entryOffset;

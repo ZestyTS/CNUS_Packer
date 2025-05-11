@@ -22,7 +22,7 @@ namespace CNUSPACKER.Packaging
             FSTEntry root = fst.FileEntries.GetRootEntry();
             root.SetContent(contents.FstContent);
 
-            await PopulateFSTEntriesAsync(config.Dir, root);
+            await PopulateFSTEntriesAsync(config.Dir, root, fst);
             logger.LogInformation("Finished reading input files. Applying content rules...");
 
             var ruleServiceLogger = loggerFactory.CreateLogger<ContentRulesService>();
@@ -41,21 +41,22 @@ namespace CNUSPACKER.Packaging
             return new NUSpackage(fst, ticket, tmd, logger);
         }
 
-        private static async Task PopulateFSTEntriesAsync(string directory, FSTEntry parent)
+        private static async Task PopulateFSTEntriesAsync(string directory, FSTEntry parent, FST fst)
         {
             foreach (var file in Directory.EnumerateFiles(directory))
             {
-                var entry = new FSTEntry(file);
+                var entry = new FSTEntry(file, fst);
                 parent.AddChild(entry);
-                await Task.Yield(); // Yield to maintain async pattern
+                await Task.Yield();
             }
 
             foreach (var dir in Directory.EnumerateDirectories(directory))
             {
-                var entry = new FSTEntry(dir);
+                var entry = new FSTEntry(dir, fst);
                 parent.AddChild(entry);
-                await PopulateFSTEntriesAsync(dir, entry);
+                await PopulateFSTEntriesAsync(dir, entry, fst);
             }
         }
+
     }
 }

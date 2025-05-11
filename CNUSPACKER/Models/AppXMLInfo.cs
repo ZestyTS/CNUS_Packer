@@ -1,23 +1,57 @@
-using CNUSPACKER.utils;
-
 namespace CNUSPACKER.Models
 {
+    /// <summary>
+    /// Represents application metadata parsed from app.xml.
+    /// </summary>
     public class AppXMLInfo
     {
-        private const int version = 0;
-        public long osVersion { get; set; }
-        public long titleID { get; set; }
-        public short titleVersion { get; set; }
-        public uint sdkVersion { get; set; }
-        public uint appType { get; set; }
-        public short groupID { get; set; }
-        public byte[] osMask { get; set; } = new byte[32];
-        public long commonID { get; set; }
+        /// <summary>
+        /// Gets or sets the OS version.
+        /// </summary>
+        public long OSVersion { get; set; }
 
+        /// <summary>
+        /// Gets or sets the title ID.
+        /// </summary>
+        public long TitleID { get; set; }
+
+        /// <summary>
+        /// Gets or sets the title version.
+        /// </summary>
+        public short TitleVersion { get; set; }
+
+        /// <summary>
+        /// Gets or sets the SDK version.
+        /// </summary>
+        public uint SDKVersion { get; set; }
+
+        /// <summary>
+        /// Gets or sets the application type.
+        /// </summary>
+        public uint AppType { get; set; }
+
+        /// <summary>
+        /// Gets or sets the group ID.
+        /// </summary>
+        public short GroupID { get; set; }
+
+        /// <summary>
+        /// Gets or sets the OS mask.
+        /// </summary>
+        public byte[] OSMask { get; set; } = new byte[32];
+
+        /// <summary>
+        /// Gets or sets the common ID.
+        /// </summary>
+        public long CommonID { get; set; }
+
+        /// <summary>
+        /// Returns a string representation of the metadata.
+        /// </summary>
         public override string ToString()
         {
-            return $"AppXMLInfo [version={version}, OSVersion={osVersion}, titleID={titleID}, titleVersion={titleVersion}, " +
-                   $"SDKVersion={sdkVersion}, appType={appType}, groupID={groupID}, OSMask={Utils.ByteArrayToHexString(osMask)}, common_id={commonID}]";
+            return $"AppXMLInfo [OSVersion={OSVersion}, TitleID={TitleID}, TitleVersion={TitleVersion}, " +
+                   $"SDKVersion={SDKVersion}, AppType={AppType}, GroupID={GroupID}, OSMask={Utils.Utils.ByteArrayToHexString(OSMask)}, CommonID={CommonID}]";
         }
     }
 }

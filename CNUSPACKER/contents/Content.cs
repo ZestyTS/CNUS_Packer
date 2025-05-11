@@ -108,7 +108,7 @@ namespace CNUSPACKER.contents
             buffer.WriteBigEndian(type);
             buffer.WriteBigEndian(encryptedFileSize);
 
-            buffer.Write(SHA1);
+            buffer.Write(SHA1, 0, SHA1.Length);
 
             return buffer.GetBuffer();
         }
@@ -187,7 +187,8 @@ namespace CNUSPACKER.contents
                         cur_offset += alignedFileSize;
 
                         long padding = alignedFileSize - entry.fileSize;
-                        fos.Write(new byte[padding]);
+                        var paddingBytes = new byte[padding];
+                        fos.Write(paddingBytes, 0, paddingBytes.Length);
                     }
                     else
                     {

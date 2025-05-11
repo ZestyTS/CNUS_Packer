@@ -47,13 +47,16 @@ namespace CNUSPACKER.contents
             MemoryStream buffer = new MemoryStream(GetFSTContentHeaderDataSize());
             foreach (Content content in contents)
             {
-                (long key, byte[] value) = content.GetFSTContentHeaderAsData(content_offset);
+                var contentData = content.GetFSTContentHeaderAsData(content_offset);
+                long key = contentData.Key; // Explicitly access the first tuple element
+                byte[] value = contentData.Value; // Explicitly access the second tuple element
                 content_offset = key;
-                buffer.Write(value);
+                buffer.Write(value, 0, value.Length); // Add offset and length
             }
 
             return buffer.GetBuffer();
         }
+
 
         public int GetFSTContentHeaderDataSize()
         {

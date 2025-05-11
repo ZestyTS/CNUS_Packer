@@ -93,7 +93,8 @@ namespace CNUSPACKER.crypto
                 int index = h0_hash_start + i;
                 if (h0Hashes.ContainsKey(index))
                 {
-                    hashes.Write(h0Hashes[index]);
+                    byte[] hash = h0Hashes[index];
+                    hashes.Write(hash, 0, hash.Length);
                 }
                 else
                 {
@@ -107,7 +108,8 @@ namespace CNUSPACKER.crypto
                 int index = h1_hash_start + i;
                 if (h1Hashes.ContainsKey(index))
                 {
-                    hashes.Write(h1Hashes[index]);
+                    byte[] hash = h1Hashes[index];
+                    hashes.Write(hash, 0, hash.Length);
                 }
                 else
                 {
@@ -121,7 +123,8 @@ namespace CNUSPACKER.crypto
                 int index = h2_hash_start + i;
                 if (h2Hashes.ContainsKey(index))
                 {
-                    hashes.Write(h2Hashes[index]);
+                    byte[] hash = h2Hashes[index];
+                    hashes.Write(hash, 0, hash.Length);
                 }
                 else
                 {
@@ -132,16 +135,19 @@ namespace CNUSPACKER.crypto
             return hashes.GetBuffer();
         }
 
+
         private byte[] GetH3Hashes()
         {
             MemoryStream buffer = new MemoryStream(h3Hashes.Count * 20);
             for (int i = 0; i < h3Hashes.Count; i++)
             {
-                buffer.Write(h3Hashes[i]);
+                byte[] hash = h3Hashes[i];
+                buffer.Write(hash, 0, hash.Length);
             }
 
             return buffer.GetBuffer();
         }
+
 
         public void SaveH3ToFile(string h3Path)
         {
@@ -149,7 +155,8 @@ namespace CNUSPACKER.crypto
             {
                 using FileStream fos = new FileStream(h3Path, FileMode.Create);
 
-                fos.Write(GetH3Hashes());
+                byte[] h3HashBytes = GetH3Hashes();
+                fos.Write(h3HashBytes, 0, h3HashBytes.Length); // Fix here
             }
         }
     }

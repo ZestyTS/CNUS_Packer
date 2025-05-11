@@ -22,28 +22,51 @@ namespace CNUSPACKER.packaging
         {
             Random rdm = new Random();
             BigEndianMemoryStream buffer = new BigEndianMemoryStream(0x350);
-            buffer.Write(Utils.HexStringToByteArray("00010004"));
+
+            byte[] hexData = Utils.HexStringToByteArray("00010004");
+            buffer.Write(hexData, 0, hexData.Length);
+
             byte[] randomData = new byte[0x100];
             rdm.NextBytes(randomData);
-            buffer.Write(randomData);
+            buffer.Write(randomData, 0, randomData.Length);
+
             buffer.Seek(0x3C, SeekOrigin.Current);
-            buffer.Write(Utils.HexStringToByteArray("526F6F742D434130303030303030332D58533030303030303063000000000000"));
+
+            hexData = Utils.HexStringToByteArray("526F6F742D434130303030303030332D58533030303030303063000000000000");
+            buffer.Write(hexData, 0, hexData.Length);
+
             buffer.Seek(0x5C, SeekOrigin.Current);
-            buffer.Write(Utils.HexStringToByteArray("010000"));
-            buffer.Write(GetEncryptedKey().key);
-            buffer.Write(Utils.HexStringToByteArray("000005"));
+
+            hexData = Utils.HexStringToByteArray("010000");
+            buffer.Write(hexData, 0, hexData.Length);
+
+            byte[] encryptedKey = GetEncryptedKey().key;
+            buffer.Write(encryptedKey, 0, encryptedKey.Length);
+
+            hexData = Utils.HexStringToByteArray("000005");
+            buffer.Write(hexData, 0, hexData.Length);
+
             randomData = new byte[0x06];
             rdm.NextBytes(randomData);
-            buffer.Write(randomData);
+            buffer.Write(randomData, 0, randomData.Length);
+
             buffer.Seek(0x04, SeekOrigin.Current);
+
             buffer.WriteBigEndian(titleID);
-            buffer.Write(Utils.HexStringToByteArray("00000011000000000000000000000005"));
+
+            hexData = Utils.HexStringToByteArray("00000011000000000000000000000005");
+            buffer.Write(hexData, 0, hexData.Length);
+
             buffer.Seek(0xB0, SeekOrigin.Current);
-            buffer.Write(Utils.HexStringToByteArray("00010014000000AC000000140001001400000000000000280000000100000084000000840003000000000000FFFFFF01"));
+
+            hexData = Utils.HexStringToByteArray("00010014000000AC000000140001001400000000000000280000000100000084000000840003000000000000FFFFFF01");
+            buffer.Write(hexData, 0, hexData.Length);
+
             buffer.Seek(0x7C, SeekOrigin.Current);
 
             return buffer.GetBuffer();
         }
+
 
         public Key GetEncryptedKey()
         {

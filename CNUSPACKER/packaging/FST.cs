@@ -41,7 +41,7 @@ namespace CNUSPACKER.packaging
 
         public static void AddString(string filename)
         {
-            strings.Write(Encoding.ASCII.GetBytes(filename));
+            strings.Write(Encoding.ASCII.GetBytes(filename), 0, filename.Length);
             strings.WriteByte(0x00);
         }
 
@@ -49,16 +49,23 @@ namespace CNUSPACKER.packaging
         {
             BigEndianMemoryStream buffer = new BigEndianMemoryStream(GetDataSize());
 
-            buffer.Write(magicbytes);
+            buffer.Write(magicbytes, 0, magicbytes.Length);
             buffer.WriteBigEndian(unknown);
             buffer.WriteBigEndian(contentCount);
             buffer.Seek(20, SeekOrigin.Current);
-            buffer.Write(contents.GetFSTContentHeaderAsData());
-            buffer.Write(fileEntries.GetAsData());
-            buffer.Write(strings.ToArray());
+
+            byte[] contentHeaderData = contents.GetFSTContentHeaderAsData();
+            buffer.Write(contentHeaderData, 0, contentHeaderData.Length);
+
+            byte[] fileEntriesData = fileEntries.GetAsData();
+            buffer.Write(fileEntriesData, 0, fileEntriesData.Length);
+
+            byte[] stringsData = strings.ToArray();
+            buffer.Write(stringsData, 0, stringsData.Length);
 
             return buffer.GetBuffer();
         }
+
 
         public int GetDataSize()
         {

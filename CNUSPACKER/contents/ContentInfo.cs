@@ -25,7 +25,7 @@ namespace CNUSPACKER.contents
             buffer.WriteBigEndian(indexOffset);
             buffer.WriteBigEndian(contentCount);
 
-            buffer.Write(SHA2Hash);
+            buffer.Write(SHA2Hash, 0, SHA2Hash.Length);
 
             return buffer.GetBuffer();
         }

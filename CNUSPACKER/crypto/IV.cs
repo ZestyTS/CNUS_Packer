@@ -1,5 +1,3 @@
-// Refactored IV.cs
-
 namespace CNUSPACKER.Crypto
 {
     /// <summary>

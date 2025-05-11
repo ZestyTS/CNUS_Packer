@@ -1,4 +1,3 @@
-// Refactored ContentDetails.cs with XML documentation
 
 namespace CNUSPACKER.Packaging
 {

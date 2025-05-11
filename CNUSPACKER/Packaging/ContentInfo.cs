@@ -1,4 +1,4 @@
-using CNUSPACKER.utils;
+using CNUSPACKER.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace CNUSPACKER.Packaging
